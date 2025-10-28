@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>QuickDCP - Verify Proof</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Public verification for QuickDCP TSA proof records" />
+  <style>
+    :root {
+      --bg: #0b0c10; --card: #13141a; --ink: #e8eaf1; --muted: #9aa0ac; --border: #232635; --ok: #2ecc71; --warn: #f1c40f; --err: #e74c3c; --acc: #4e6af3;
+    }
+    * { box-sizing: border-box }
+    html, body { height: 100% }
+    body { margin: 0; background: linear-gradient(180deg, #0b0c10 0%, #0b0c10 50%, #0e1017 100%); color: var(--ink); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
+    header { padding: 28px 18px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: rgba(11,12,16,.65); backdrop-filter: blur(6px) }
+    header h1 { margin: 0; font-size: 22px; letter-spacing: .3px }
+    header .sub { margin-top: 6px; color: var(--muted); font-size: 13px }
+    main { max-width: 900px; margin: 0 auto; padding: 26px 18px 80px }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px }
+    .row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center }
+    input { width: 100%; padding: 12px 12px; border-radius: 12px; border: 1px solid var(--border); background: #0e1017; color: var(--ink); font-size: 15px }
+    input:focus { outline: none; border-color: #3a3f57; box-shadow: 0 0 0 3px rgba(78,106,243,.1) }
+    .btn { padding: 12px 14px; border-radius: 12px; border: 1px solid #2a2f46; background: #161925; color: var(--ink); cursor: pointer; font-size: 14px }
+    .btn:hover { border-color: #3a3f57 }
+    .muted { color: var(--muted) }
+    .result { margin-top: 14px; display: none }
+    .result.show { display: block }
+    .kv { display: grid; grid-template-columns: 140px 1fr; gap: 8px; align-items: start }
+    .kv .k { color: var(--muted) }
+    .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--border); font-size: 12px; color: var(--muted) }
+    .status { font-weight: 600 }
+    .status.ok { color: var(--ok) }
+    .status.pending { color: var(--warn) }
+    .actions { display: flex; gap: 8px; margin-top: 10px }
+    .copy { font-size: 12px; color: var(--muted); cursor: pointer; padding: 4px 8px; border: 1px dashed #2c3148; border-radius: 8px }
+    .copy:hover { color: #cfd6e6; border-color: #3a3f57 }
+    pre { background: #0e1017; border: 1px solid var(--border); border-radius: 12px; padding: 12px; overflow: auto; color: #e2e6f3 }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px }
+    .grid { display: grid; gap: 16px; grid-template-columns: repeat(12, 1fr) }
+    .span-7 { grid-column: span 7 }
+    .span-5 { grid-column: span 5 }
+    .hint { font-size: 12px; color: var(--muted); margin-top: 8px }
+    .qrcode { display: grid; place-items: center; padding: 12px; border: 1px dashed var(--border); border-radius: 12px; background: #0e1017 }
+    .warn { color: var(--warn) }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>QuickDCP - Verify Proof</h1>
+    <div class="sub">Check a job_id or a manifest SHA-256 against the public proof store</div>
+  </header>
+  <main>
+    <section class="card">
+      <div class="row">
+        <input id="ref" placeholder="JOB-123 or 64-char hex manifest sha" autocomplete="on" />
+        <button class="btn" id="go">Verify</button>
+      </div>
+      <div class="hint">Tip: paste a job id like <code>JOB-LOCAL</code> or a hex digest. Append <code>?ref=...</code> to the page URL to prefill.</div>
+
+      <div id="result" class="result">
+        <h3 style="margin:14px 0 8px">Result</h3>
+        <div class="kv">
+          <div class="k">Status</div>
+          <div><span id="status" class="status">-</span></div>
+          <div class="k">Job ID</div>
+          <div><code id="job"></code></div>
+          <div class="k">Manifest SHA-256</div>
+          <div><code id="sha"></code></div>
+        </div>
+        <div class="actions">
+          <div class="copy" id="copyLink">Copy link</div>
+          <div class="copy" id="copyJSON">Copy JSON</div>
+          <div class="copy" id="openJobs">Open /jobs</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid" style="margin-top:16px">
+      <div class="card span-7">
+        <h3 style="margin:0 0 8px">API call</h3>
+        <pre><code id="curl">curl -s $API/verify/JOB-123 | jq</code></pre>
+        <div class="hint">Use this call from automation or share it with a festival for independent verification.</div>
+      </div>
+      <div class="card span-5">
+        <h3 style="margin:0 0 8px">Share</h3>
+        <div class="qrcode">
+          <canvas id="qr" width="160" height="160"></canvas>
+        </div>
+        <div class="hint">Scan to reopen this verification page with the current reference embedded.</div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:16px">
+      <h3 style="margin:0 0 8px">Troubleshooting</h3>
+      <ul>
+        <li>If you see <span class="warn">PENDING</span>, the TSA acknowledgment has not been verified yet.</li>
+        <li>Make sure the server where this page is hosted can reach <code>/verify/&lt;ref&gt;</code>.</li>
+        <li>Manifest stays locked at <code>/jobs/&lt;job_id&gt;</code> until status is VALID.</li>
+      </ul>
+    </section>
+  </main>
+
+  <script>
+    const els = {
+      ref: document.getElementById('ref'),
+      go: document.getElementById('go'),
+      res: document.getElementById('result'),
+      status: document.getElementById('status'),
+      job: document.getElementById('job'),
+      sha: document.getElementById('sha'),
+      curl: document.getElementById('curl'),
+      qr: document.getElementById('qr'),
+      copyLink: document.getElementById('copyLink'),
+      copyJSON: document.getElementById('copyJSON'),
+      openJobs: document.getElementById('openJobs'),
+    };
+
+    function isHex64(s){ return /^[a-fA-F0-9]{64}$/.test((s||'').trim()); }
+
+    function apiBase(){
+      // Resolve API origin relative to where this page is served
+      const { origin } = window.location;
+      return origin; // page is served by the same FastAPI app
+    }
+
+    function setStatus(txt){
+      els.status.textContent = txt;
+      els.status.classList.remove('ok','pending');
+      if (txt === 'VALID') els.status.classList.add('ok');
+      else els.status.classList.add('pending');
+    }
+
+    function updateCurl(ref){
+      const url = apiBase()+"/verify/"+encodeURIComponent(ref);
+      els.curl.textContent = `curl -s ${url} | jq`;
+    }
+
+    function updateQR(ref){
+      const u = new URL(window.location.href);
+      u.searchParams.set('ref', ref);
+      // Generate QR
+      if (window.QRCode){
+        QRCode.toCanvas(els.qr, u.toString(), { width: 160, margin: 1 }, function(){ /* noop */ });
+      }
+    }
+
+    async function verifyRef(){
+      const ref = (els.ref.value||'').trim();
+      if (!ref) { alert('Enter a job id or a 64-char hex digest.'); return; }
+      try {
+        setStatus('...');
+        els.res.classList.add('show');
+        const res = await fetch(apiBase()+"/verify/"+encodeURIComponent(ref));
+        const j = await res.json();
+        if (!res.ok){ throw new Error(JSON.stringify(j)); }
+        setStatus(j.status || 'PENDING');
+        els.job.textContent = j.job_id || '-';
+        els.sha.textContent = j.manifest_sha256 || '-';
+        updateCurl(ref);
+        updateQR(ref);
+        // Copy actions
+        els.copyLink.onclick = async () => {
+          const u = new URL(window.location.href); u.searchParams.set('ref', ref);
+          await navigator.clipboard.writeText(u.toString());
+          els.copyLink.textContent = 'Copied'; setTimeout(()=>els.copyLink.textContent='Copy link',1200);
+        };
+        els.copyJSON.onclick = async () => {
+          await navigator.clipboard.writeText(JSON.stringify(j, null, 2));
+          els.copyJSON.textContent = 'Copied'; setTimeout(()=>els.copyJSON.textContent='Copy JSON',1200);
+        };
+        els.openJobs.onclick = () => {
+          const id = j.job_id || ref; if (id) window.open(apiBase()+"/jobs/"+encodeURIComponent(id), '_blank');
+        };
+      } catch (e){
+        setStatus('PENDING');
+        els.job.textContent = '-';
+        els.sha.textContent = '-';
+        updateCurl(ref);
+        updateQR(ref);
+      }
+    }
+
+    // Wire events
+    els.go.addEventListener('click', verifyRef);
+    els.ref.addEventListener('keydown', (e)=>{ if (e.key==='Enter') verifyRef(); });
+
+    // Prefill via ?ref=
+    const q = new URLSearchParams(window.location.search);
+    const preset = q.get('ref');
+    if (preset){ els.ref.value = preset; verifyRef(); }
+  </script>
+</body>
+</html>

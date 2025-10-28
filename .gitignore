@@ -1,0 +1,9 @@
+.env
+*.tsr
+*.tsq
+vault/*.json
+__pycache__/
+*.pyc
+node_modules/
+.DS_Store
+

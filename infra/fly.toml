@@ -1,0 +1,45 @@
+# fly.toml - Deployment configuration for QuickDCP API (fixed)
+# Compatible with Fly.io
+#
+# flyctl launch --copy-config --name quickdcp-api
+# flyctl deploy
+
+app = "quickdcp-api"
+primary_region = "fra"
+kill_signal = "SIGINT"
+kill_timeout = 5
+
+[build]
+  dockerfile = "infra/Dockerfile"
+
+[env]
+  PORT = "8080"
+  PYTHONUNBUFFERED = "1"
+  KILL = "0"
+  AWS_DEFAULT_REGION = "eu-central-1"
+  S3_BUCKET_INGEST = "quickdcp-ingest"
+  WORKER_TOKEN = "${WORKER_TOKEN}"
+
+[[services]]
+  internal_port = 8080
+  processes = ["app"]
+  protocol = "tcp"
+
+  [services.concurrency]
+    hard_limit = 50
+    soft_limit = 25
+    type = "connections"
+
+  [[services.ports]]
+    handlers = ["http"]
+    port = 80
+
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port = 443
+
+  [[services.tcp_checks]]
+    grace_period = "5s"
+    interval = "15s"
+    restart_limit = 3
+    timeout = "2s"

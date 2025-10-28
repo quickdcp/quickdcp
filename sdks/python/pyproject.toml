@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quickdcp"
+version = "0.1.0"
+description = "QuickDCP Python SDK for API integration"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+  { name = "Kaaffilm DevOps", email = "ops@quickdcp.com" }
+]
+dependencies = [
+  "requests>=2.31.0",
+]
+
+[project.urls]
+Homepage = "https://quickdcp.com"
+Repository = "https://github.com/kaaffilm/quickdcp"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["quickdcp*"]

@@ -15,9 +15,8 @@ services:
       S3_BUCKET_OUT: quickdcp-out
       S3_BUCKET_VAULT: quickdcp-vault
       S3_BUCKET_LOGS: quickdcp-logs
-      AWS_ENDPOINT_URL: http://minio:9000
-      WORKER_TOKEN: dev-worker-token
       DATABASE_URL: postgresql://postgres:postgres@supabase:5432/postgres
+      WORKER_TOKEN: dev-worker-token
       QD_COST_GUARD_EUR: 150
     ports:
       - "8080:8080"
@@ -52,16 +51,18 @@ services:
 
   mc-init:
     image: minio/mc:RELEASE.2025-02-18T16-25-55Z
+    container_name: quickdcp-mc-init
     depends_on:
       - minio
     entrypoint: ["/bin/sh", "-c"]
-    command: >
-      until (/usr/bin/mc alias set local http://minio:9000 minio minio123) do
-        echo '...waiting for minio...' && sleep 2;
-      done &&
-      /usr/bin/mc mb -p local/quickdcp-ingest || true &&
-      /usr/bin/mc mb -p local/quickdcp-out || true &&
-      /usr/bin/mc mb -p local/quickdcp-vault || true &&
+    command: |
+      until (/usr/bin/mc alias set local http://minio:9000 minio minio123); do
+        echo 'waiting for minio...'
+        sleep 2
+      done
+      /usr/bin/mc mb -p local/quickdcp-ingest || true
+      /usr/bin/mc mb -p local/quickdcp-out || true
+      /usr/bin/mc mb -p local/quickdcp-vault || true
       /usr/bin/mc mb -p local/quickdcp-logs || true
 
   supabase:

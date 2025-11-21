@@ -1,14 +1,13 @@
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
-
-from api.routes import proof, upload_stream, internal, verify, billing, kdm
-from api.utils.auth import require_auth  # kept for future global deps
-from api.utils.db import DB
-from api import startup_check
-
-from pydantic import BaseModel
 from typing import Any, Optional
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+
+from api import startup_check
+from api.routes import billing, internal, kdm, proof, upload_stream, verify
+from api.utils.db import DB
 
 
 class ErrorResponse(BaseModel):
@@ -26,10 +25,8 @@ app = FastAPI(
     openapi_url="/openapi.json",
 )
 
-
 # Run startup checks once at import time (env, required files, etc.)
 startup_check.run()
-
 
 # CORS for local dev and basic cross-origin usage
 app.add_middleware(
@@ -58,7 +55,6 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     # Catch-all: log and wrap
-    # In production you would log to Sentry/CloudWatch/etc.
     payload = ErrorResponse(
         code="INTERNAL_ERROR",
         message="Unexpected error",
@@ -75,7 +71,6 @@ async def healthz() -> dict[str, str]:
     # Basic health + DB connectivity check
     try:
         db = DB()
-        # simple query to ensure connectivity; adjust to your schema
         with db.conn.cursor() as cur:
             cur.execute("SELECT 1;")
             cur.fetchone()
@@ -98,3 +93,15 @@ app.include_router(kdm.router)
 @app.get("/")
 async def root() -> dict[str, str]:
     return {"service": "quickdcp", "status": "ok"}
+
+
+if __name__ == "__main__":
+    # This is what keeps the container alive when it runs `python -m api.main`
+    import uvicorn
+
+    uvicorn.run(
+        "api.main:app",
+        host="0.0.0.0",
+        port=8080,
+        reload=False,
+    )

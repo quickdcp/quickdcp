@@ -1,0 +1,3 @@
+* @quickdcp-admin
+infra/* @quickdcp-admin
+supabase/migrations/* @quickdcp-admin

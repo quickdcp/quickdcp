@@ -7,7 +7,23 @@ DB_URL = os.getenv("DATABASE_URL")
 
 class DB:
     def __init__(self):
-        self.conn = psycopg.connect(DB_URL, autocommit=True)
+        # Robust connection with retry: Postgres may not be ready when API starts
+        import time
+        from psycopg import OperationalError
+
+        last_err = None
+        for _ in range(30):
+            try:
+                self.conn = psycopg.connect(DB_URL, autocommit=True)
+                last_err = None
+                break
+            except OperationalError as exc:
+                last_err = exc
+                time.sleep(1)
+
+        if last_err is not None:
+            # Give up after retries so the error is visible in logs
+            raise last_err
 
     # ---------------------------------------------------------
     # CUSTOMER CONTEXT (for RLS)

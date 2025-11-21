@@ -1,1 +1,412 @@
-{"openapi":"3.1.0","info":{"title":"QuickDCP - Complete","version":"1.0.0"},"paths":{"/":{"get":{"summary":"Root","operationId":"root__get","responses":{"200":{"description":"Successful Response","content":{"text/html":{"schema":{"type":"string"}}}}}}},"/health":{"get":{"summary":"Health","operationId":"health_health_get","responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}}}}},"/upload/init":{"post":{"tags":["upload"],"summary":"Init Upload","description":"Start a multipart upload and return UploadId + object key.\nClient will PUT parts to presigned URLs with x-amz-checksum-sha256.","operationId":"init_upload_upload_init_post","parameters":[{"name":"X-QD-Customer","in":"header","required":true,"schema":{"type":"string","title":"X-Qd-Customer"}},{"name":"Authorization","in":"header","required":true,"schema":{"type":"string","title":"Authorization"}}],"requestBody":{"required":true,"content":{"application/x-www-form-urlencoded":{"schema":{"$ref":"#/components/schemas/Body_init_upload_upload_init_post"}}}},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/InitRes"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/upload/part":{"post":{"tags":["upload"],"summary":"Sign Part","operationId":"sign_part_upload_part_post","parameters":[{"name":"X-QD-Customer","in":"header","required":true,"schema":{"type":"string","title":"X-Qd-Customer"}},{"name":"Authorization","in":"header","required":true,"schema":{"type":"string","title":"Authorization"}}],"requestBody":{"required":true,"content":{"application/x-www-form-urlencoded":{"schema":{"$ref":"#/components/schemas/Body_sign_part_upload_part_post"}}}},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/PartSignRes"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/upload/complete":{"post":{"tags":["upload"],"summary":"Complete","operationId":"complete_upload_complete_post","parameters":[{"name":"X-QD-Customer","in":"header","required":true,"schema":{"type":"string","title":"X-Qd-Customer"}},{"name":"Authorization","in":"header","required":true,"schema":{"type":"string","title":"Authorization"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/upload/head":{"get":{"tags":["upload"],"summary":"Head","description":"HEAD the object to confirm existence/size (post-complete).","operationId":"head_upload_head_get","parameters":[{"name":"key","in":"query","required":true,"schema":{"type":"string","title":"Key"}},{"name":"X-QD-Customer","in":"header","required":true,"schema":{"type":"string","title":"X-Qd-Customer"}},{"name":"Authorization","in":"header","required":true,"schema":{"type":"string","title":"Authorization"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HeadRes"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/jobs/render":{"post":{"tags":["jobs"],"summary":"Render Job","description":"Create a job and set it to QUEUED.\nWorker will pick it up via /internal/next-job.","operationId":"render_job_jobs_render_post","parameters":[{"name":"X-QD-Customer","in":"header","required":true,"schema":{"type":"string","title":"X-Qd-Customer"}},{"name":"Authorization","in":"header","required":true,"schema":{"type":"string","title":"Authorization"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/RenderRequest"}}}},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/RenderResponse"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/jobs/{job_id}":{"get":{"tags":["jobs"],"summary":"Job Status","description":"Return job status if not proven; unlock manifest only after TSA OK.","operationId":"job_status_jobs__job_id__get","parameters":[{"name":"job_id","in":"path","required":true,"schema":{"type":"string","title":"Job Id"}},{"name":"X-QD-Customer","in":"header","required":true,"schema":{"type":"string","title":"X-Qd-Customer"}},{"name":"Authorization","in":"header","required":true,"schema":{"type":"string","title":"Authorization"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/jobs":{"get":{"tags":["jobs"],"summary":"List Jobs","description":"List all jobs with their statuses (demo only, no paging).","operationId":"list_jobs_jobs_get","parameters":[{"name":"X-QD-Customer","in":"header","required":true,"schema":{"type":"string","title":"X-Qd-Customer"}},{"name":"Authorization","in":"header","required":true,"schema":{"type":"string","title":"Authorization"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/JobSummary"},"title":"Response List Jobs Jobs Get"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/jobs/internal/next-job":{"post":{"tags":["jobs"],"summary":"Next Job","description":"Worker pulls the next QUEUED job.","operationId":"next_job_jobs_internal_next_job_post","parameters":[{"name":"x-worker-token","in":"header","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"X-Worker-Token"}},{"name":"X-QD-Customer","in":"header","required":true,"schema":{"type":"string","title":"X-Qd-Customer"}},{"name":"Authorization","in":"header","required":true,"schema":{"type":"string","title":"Authorization"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/WorkerNextResponse"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/jobs/internal/update-job":{"post":{"tags":["jobs"],"summary":"Update Job","description":"Worker marks job as PASS/FAIL and stores manifest.","operationId":"update_job_jobs_internal_update_job_post","parameters":[{"name":"x-worker-token","in":"header","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"X-Worker-Token"}},{"name":"X-QD-Customer","in":"header","required":true,"schema":{"type":"string","title":"X-Qd-Customer"}},{"name":"Authorization","in":"header","required":true,"schema":{"type":"string","title":"Authorization"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/WorkerUpdateRequest"}}}},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/proof/init":{"post":{"tags":["proof"],"summary":"Init Proof","operationId":"init_proof_proof_init_post","parameters":[{"name":"X-QD-Customer","in":"header","required":true,"schema":{"type":"string","title":"X-Qd-Customer"}},{"name":"Authorization","in":"header","required":true,"schema":{"type":"string","title":"Authorization"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/ProofInitReq"}}}},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ProofInitRes"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/proof/ack/tsa":{"post":{"tags":["proof"],"summary":"Ack Tsa","operationId":"ack_tsa_proof_ack_tsa_post","parameters":[{"name":"X-QD-Customer","in":"header","required":true,"schema":{"type":"string","title":"X-Qd-Customer"}},{"name":"Authorization","in":"header","required":true,"schema":{"type":"string","title":"Authorization"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/ProofAckReq"}}}},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ProofStatusRes"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/proof/status/{job_id}":{"get":{"tags":["proof"],"summary":"Proof Status","operationId":"proof_status_proof_status__job_id__get","parameters":[{"name":"job_id","in":"path","required":true,"schema":{"type":"string","title":"Job Id"}},{"name":"X-QD-Customer","in":"header","required":true,"schema":{"type":"string","title":"X-Qd-Customer"}},{"name":"Authorization","in":"header","required":true,"schema":{"type":"string","title":"Authorization"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/ProofStatusRes"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/kdm/issue":{"post":{"tags":["kdm"],"summary":"Issue Kdm","operationId":"issue_kdm_kdm_issue_post","parameters":[{"name":"X-QD-Customer","in":"header","required":true,"schema":{"type":"string","title":"X-Qd-Customer"}},{"name":"Authorization","in":"header","required":true,"schema":{"type":"string","title":"Authorization"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/KDMIssueRequest"}}}},"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/KDMIssueResponse"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/kdm/list/{job_id}":{"get":{"tags":["kdm"],"summary":"List Kdms","operationId":"list_kdms_kdm_list__job_id__get","parameters":[{"name":"job_id","in":"path","required":true,"schema":{"type":"string","title":"Job Id"}},{"name":"X-QD-Customer","in":"header","required":true,"schema":{"type":"string","title":"X-Qd-Customer"}},{"name":"Authorization","in":"header","required":true,"schema":{"type":"string","title":"Authorization"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/KDMRecord"},"title":"Response List Kdms Kdm List  Job Id  Get"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/verify/{ref}":{"get":{"tags":["verify"],"summary":"Verify","description":"Verify by job_id or manifest SHA-256.\n\n1) Try to load a proof record by job_id (exact match)\n2) If not found, scan known records and return the one whose\n   manifest_sha256 equals `ref` (case-insensitive)","operationId":"verify_verify__ref__get","parameters":[{"name":"ref","in":"path","required":true,"schema":{"type":"string","title":"Ref"}}],"responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{"$ref":"#/components/schemas/VerifyResponse"}}}},"422":{"description":"Validation Error","content":{"application/json":{"schema":{"$ref":"#/components/schemas/HTTPValidationError"}}}}}}},"/metrics":{"get":{"summary":"Metrics","operationId":"metrics_metrics_get","responses":{"200":{"description":"Successful Response","content":{"application/json":{"schema":{}}}}}}}},"components":{"schemas":{"Body_init_upload_upload_init_post":{"properties":{"filename":{"type":"string","title":"Filename"},"size":{"type":"integer","title":"Size"},"sha256":{"type":"string","title":"Sha256"}},"type":"object","required":["filename","size","sha256"],"title":"Body_init_upload_upload_init_post"},"Body_sign_part_upload_part_post":{"properties":{"key":{"type":"string","title":"Key"},"upload_id":{"type":"string","title":"Upload Id"},"part_number":{"type":"integer","title":"Part Number"}},"type":"object","required":["key","upload_id","part_number"],"title":"Body_sign_part_upload_part_post"},"CinemaCert":{"properties":{"cn":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Cn","description":"Common Name of the cinema device"},"cert_pem":{"type":"string","title":"Cert Pem","description":"Cinema certificate PEM text"}},"type":"object","required":["cert_pem"],"title":"CinemaCert"},"HTTPValidationError":{"properties":{"detail":{"items":{"$ref":"#/components/schemas/ValidationError"},"type":"array","title":"Detail"}},"type":"object","title":"HTTPValidationError"},"HeadRes":{"properties":{"key":{"type":"string","title":"Key"},"exists":{"type":"boolean","title":"Exists"},"size":{"anyOf":[{"type":"integer"},{"type":"null"}],"title":"Size"}},"type":"object","required":["key","exists"],"title":"HeadRes"},"InitRes":{"properties":{"upload_id":{"type":"string","title":"Upload Id"},"key":{"type":"string","title":"Key"},"size":{"type":"integer","title":"Size"},"sha256":{"type":"string","title":"Sha256"}},"type":"object","required":["upload_id","key","size","sha256"],"title":"InitRes"},"JobSummary":{"properties":{"job_id":{"type":"string","title":"Job Id"},"status":{"type":"string","title":"Status"}},"type":"object","required":["job_id","status"],"title":"JobSummary"},"KDMIssueRequest":{"properties":{"job_id":{"type":"string","title":"Job Id"},"cinemas":{"items":{"$ref":"#/components/schemas/CinemaCert"},"type":"array","title":"Cinemas"},"key_id":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Key Id","description":"Content key identifier (UUID hex)"},"cpl_id":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Cpl Id","description":"Composition Playlist UUID"},"valid_from":{"anyOf":[{"type":"string","format":"date-time"},{"type":"null"}],"title":"Valid From","description":"UTC start time; default now"},"valid_until":{"anyOf":[{"type":"string","format":"date-time"},{"type":"null"}],"title":"Valid Until","description":"UTC end time; mutually exclusive with days"},"days":{"anyOf":[{"type":"integer"},{"type":"null"}],"title":"Days","description":"Validity window in days (max 60)","default":14},"delivery_emails":{"anyOf":[{"items":{"type":"string"},"type":"array"},{"type":"null"}],"title":"Delivery Emails"}},"type":"object","required":["job_id","cinemas"],"title":"KDMIssueRequest"},"KDMIssueResponse":{"properties":{"job_id":{"type":"string","title":"Job Id"},"kdm_count":{"type":"integer","title":"Kdm Count"},"kdms":{"items":{"$ref":"#/components/schemas/KDMRecord"},"type":"array","title":"Kdms"}},"type":"object","required":["job_id","kdm_count","kdms"],"title":"KDMIssueResponse"},"KDMRecord":{"properties":{"kdm_id":{"type":"string","title":"Kdm Id"},"cn":{"type":"string","title":"Cn"},"cert_fingerprint":{"type":"string","title":"Cert Fingerprint"},"valid_from":{"type":"string","title":"Valid From"},"valid_until":{"type":"string","title":"Valid Until"},"key_id":{"type":"string","title":"Key Id"},"cpl_id":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Cpl Id"},"delivered":{"type":"boolean","title":"Delivered","default":false}},"type":"object","required":["kdm_id","cn","cert_fingerprint","valid_from","valid_until","key_id"],"title":"KDMRecord"},"Manifest":{"properties":{"job_id":{"type":"string","title":"Job Id"},"profile":{"type":"object","title":"Profile"},"outputs":{"type":"object","title":"Outputs"},"qc":{"$ref":"#/components/schemas/ManifestQC"},"proof":{"type":"object","title":"Proof"}},"type":"object","required":["job_id"],"title":"Manifest"},"ManifestQC":{"properties":{"audio_lufs":{"anyOf":[{"type":"number"},{"type":"null"}],"title":"Audio Lufs"},"video_issues":{"anyOf":[{"type":"integer"},{"type":"null"}],"title":"Video Issues"},"subtitle_sync_ms":{"anyOf":[{"type":"integer"},{"type":"null"}],"title":"Subtitle Sync Ms"}},"type":"object","title":"ManifestQC"},"PartSignRes":{"properties":{"url":{"type":"string","title":"Url"}},"type":"object","required":["url"],"title":"PartSignRes"},"ProofAckReq":{"properties":{"job_id":{"type":"string","title":"Job Id"},"tsr_base64":{"type":"string","title":"Tsr Base64","description":"Base64-encoded TSR (DER)"},"tsa_cert_pem":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Tsa Cert Pem","description":"Optional CA bundle to verify against"}},"type":"object","required":["job_id","tsr_base64"],"title":"ProofAckReq"},"ProofInitReq":{"properties":{"job_id":{"type":"string","title":"Job Id","description":"Target job id"}},"type":"object","required":["job_id"],"title":"ProofInitReq"},"ProofInitRes":{"properties":{"job_id":{"type":"string","title":"Job Id"},"manifest_sha256":{"type":"string","title":"Manifest Sha256"},"tsq_der":{"type":"string","title":"Tsq Der","description":"Base64-encoded TSQ in DER format"}},"type":"object","required":["job_id","manifest_sha256","tsq_der"],"title":"ProofInitRes"},"ProofStatusRes":{"properties":{"job_id":{"type":"string","title":"Job Id"},"status":{"type":"string","title":"Status"},"manifest_sha256":{"type":"string","title":"Manifest Sha256"},"tsa_ok":{"type":"boolean","title":"Tsa Ok"}},"type":"object","required":["job_id","status","manifest_sha256","tsa_ok"],"title":"ProofStatusRes"},"RenderProfile":{"properties":{"res":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Res","description":"e.g. 2K, 4K"},"shape":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Shape","description":"e.g. FLAT, SCOPE"},"extras":{"anyOf":[{"type":"object"},{"type":"null"}],"title":"Extras","description":"additional encode options"}},"type":"object","title":"RenderProfile"},"RenderRequest":{"properties":{"job_id":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Job Id","description":"optional custom job id"},"input_key":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Input Key","description":"location of uploaded asset"},"profile":{"$ref":"#/components/schemas/RenderProfile"}},"type":"object","title":"RenderRequest"},"RenderResponse":{"properties":{"job_id":{"type":"string","title":"Job Id"},"status":{"type":"string","title":"Status"}},"type":"object","required":["job_id","status"],"title":"RenderResponse"},"ValidationError":{"properties":{"loc":{"items":{"anyOf":[{"type":"string"},{"type":"integer"}]},"type":"array","title":"Location"},"msg":{"type":"string","title":"Message"},"type":{"type":"string","title":"Error Type"}},"type":"object","required":["loc","msg","type"],"title":"ValidationError"},"VerifyResponse":{"properties":{"status":{"type":"string","title":"Status","description":"PENDING or VALID"},"job_id":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Job Id"},"manifest_sha256":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Manifest Sha256"}},"type":"object","required":["status"],"title":"VerifyResponse"},"WorkerNextResponse":{"properties":{"job_id":{"anyOf":[{"type":"string"},{"type":"null"}],"title":"Job Id"},"profile":{"anyOf":[{"type":"object"},{"type":"null"}],"title":"Profile"},"status":{"type":"string","title":"Status","default":"EMPTY"}},"type":"object","title":"WorkerNextResponse"},"WorkerUpdateRequest":{"properties":{"job_id":{"type":"string","title":"Job Id"},"manifest":{"$ref":"#/components/schemas/Manifest"},"status":{"type":"string","enum":["PASS","FAIL","PROCESSING","QUEUED"],"title":"Status","default":"PASS"}},"type":"object","required":["job_id","manifest"],"title":"WorkerUpdateRequest"}}}}
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "QuickDCP API",
+    "version": "1.0.0",
+    "description": "QuickDCP API for upload, job orchestration, proof chain, and verification."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Local dev"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      }
+    },
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string" },
+          "message": { "type": "string" },
+          "details": { "type": "object", "nullable": true }
+        },
+        "required": ["code", "message"]
+      },
+      "Job": {
+        "type": "object",
+        "properties": {
+          "job_id": { "type": "string" },
+          "status": { "type": "string" },
+          "profile": { "type": "object" },
+          "manifest": { "type": "object" }
+        },
+        "required": ["job_id", "status"]
+      },
+      "JobCreateRequest": {
+        "type": "object",
+        "properties": {
+          "customer_code": { "type": "string" },
+          "profile": { "type": "object" }
+        },
+        "required": ["customer_code", "profile"]
+      },
+      "JobStatusResponse": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Job" }
+        ]
+      },
+      "ProofInitRequest": {
+        "type": "object",
+        "properties": {
+          "job_id": { "type": "string" },
+          "manifest_sha256": { "type": "string" }
+        },
+        "required": ["job_id", "manifest_sha256"]
+      },
+      "ProofAckTsaRequest": {
+        "type": "object",
+        "properties": {
+          "job_id": { "type": "string" },
+          "tsr": {
+            "type": "string",
+            "description": "Base64-encoded TSA response"
+          }
+        },
+        "required": ["job_id", "tsr"]
+      },
+      "VerifyResponse": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean" },
+          "job_id": { "type": "string" },
+          "status": { "type": "string" },
+          "manifest": { "type": "object" },
+          "proof": { "type": "object" }
+        },
+        "required": ["ok"]
+      }
+    }
+  },
+  "security": [
+    { "ApiKeyAuth": [] }
+  ],
+  "paths": {
+    "/healthz": {
+      "get": {
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "Service healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean" },
+                    "db": { "type": "string" }
+                  },
+                  "required": ["ok"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/upload/init": {
+      "post": {
+        "summary": "Init multipart upload",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "filename": { "type": "string" },
+                  "size": { "type": "integer" },
+                  "sha256": { "type": "string" }
+                },
+                "required": ["filename", "size", "sha256"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Upload initialized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "upload_id": { "type": "string" },
+                    "key": { "type": "string" }
+                  },
+                  "required": ["upload_id", "key"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/upload/part": {
+      "post": {
+        "summary": "Sign upload part",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "key": { "type": "string" },
+                  "upload_id": { "type": "string" },
+                  "part_number": { "type": "integer" }
+                },
+                "required": ["key", "upload_id", "part_number"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Presigned URL returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "url": { "type": "string" }
+                  },
+                  "required": ["url"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/upload/complete": {
+      "post": {
+        "summary": "Complete multipart upload",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "key": { "type": "string" },
+                  "upload_id": { "type": "string" },
+                  "parts": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "etag": { "type": "string" },
+                        "part_number": { "type": "integer" }
+                      },
+                      "required": ["etag", "part_number"]
+                    }
+                  }
+                },
+                "required": ["key", "upload_id", "parts"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Upload completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": { "type": "string" },
+                    "size": { "type": "integer" }
+                  },
+                  "required": ["key"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs/render": {
+      "post": {
+        "summary": "Enqueue render job",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/JobCreateRequest" }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Job accepted",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Job" }
+              }
+            }
+          },
+          "402": {
+            "description": "Limit exceeded / cost guard",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs/{job_id}": {
+      "get": {
+        "summary": "Get job status",
+        "security": [{ "ApiKeyAuth": [] }],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job status",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/JobStatusResponse" }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/proof/init": {
+      "post": {
+        "summary": "Create TSQ for proof",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ProofInitRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TSQ created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "job_id": { "type": "string" },
+                    "tsq": {
+                      "type": "string",
+                      "description": "Base64-encoded TSQ"
+                    }
+                  },
+                  "required": ["job_id", "tsq"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/proof/ack/tsa": {
+      "post": {
+        "summary": "Verify TSA response and finalize proof",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ProofAckTsaRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Proof accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "job_id": { "type": "string" },
+                    "status": { "type": "string" },
+                    "tsa_time": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": ["job_id", "status"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/verify/{ref}": {
+      "get": {
+        "summary": "Verify proof by reference",
+        "parameters": [
+          {
+            "name": "ref",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Verification response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/VerifyResponse" }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

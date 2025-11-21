@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>QuickDCP — System Core Console</title>
+
+<style>
+  :root {
+    --bg: #020307;
+    --fg: #e8e8ee;
+    --card: rgba(8,12,20,0.85);
+    --card-border: rgba(160,200,255,0.18);
+    --accent: #00b8ff;
+    --accent2: #00ffa2;
+    --gold: #d8b15a;
+    --error: #ff4d6a;
+    --shadow: 0 16px 46px rgba(0,0,0,0.8);
+    --blur: blur(22px);
+  }
+
+  * { box-sizing:border-box; }
+
+  body {
+    margin:0;
+    background:var(--bg);
+    color:var(--fg);
+    font-family:system-ui,Arial,-apple-system,Segoe UI,sans-serif;
+    overflow-x:hidden;
+    animation:screen-on 1.1s ease;
+  }
+
+  @keyframes screen-on {
+    0% { filter:brightness(0) blur(8px); opacity:0; }
+    40% { filter:brightness(0.25) blur(2px); opacity:1; }
+    100% { filter:brightness(1) blur(0); }
+  }
+
+  /* BACKGROUND: OBSERVATORY STARFIELD + NEON GRID */
+  #bg-stars, #bg-grid {
+    position:fixed;
+    top:0; left:0;
+    width:100vw; height:100vh;
+    z-index:-6;
+  }
+  #bg-stars {
+    background:
+      radial-gradient(circle at 10% 20%, rgba(255,255,255,0.13), transparent 55%),
+      radial-gradient(circle at 80% 10%, rgba(0,255,255,0.14), transparent 55%),
+      radial-gradient(circle at 50% 90%, rgba(216,177,90,0.14), transparent 55%),
+      #020307;
+  }
+  #bg-grid::after {
+    content:"";
+    position:absolute;
+    inset:0;
+    background-image:
+      linear-gradient(rgba(0,255,255,0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,255,0.08) 1px, transparent 1px);
+    background-size:40px 40px;
+    transform:perspective(260px) rotateX(62deg) translateY(140px);
+    opacity:0.2;
+    animation:grid-shift 24s linear infinite;
+  }
+  @keyframes grid-shift {
+    0% { transform:perspective(260px) rotateX(62deg) translateY(140px); }
+    100% { transform:perspective(260px) rotateX(62deg) translateY(-220px); }
+  }
+
+  /* VOLUMETRIC FOG */
+  #fog-layer {
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+    background:radial-gradient(circle at 50% 35%, rgba(255,255,255,0.08), transparent 70%);
+    mix-blend-mode:screen;
+    animation:fogflow 26s ease-in-out infinite alternate;
+    z-index:-5;
+  }
+  @keyframes fogflow {
+    0% { transform:translate(-16px,-12px) scale(1.03); opacity:0.35; }
+    100% { transform:translate(26px,22px) scale(1.08); opacity:0.7; }
+  }
+
+  /* AUDIO‑REACTIVE RING */
+  #audio-ring {
+    position:fixed;
+    top:50%; left:50%;
+    width:260px; height:260px;
+    border-radius:50%;
+    transform:translate(-50%,-50%) scale(0.6);
+    box-shadow:
+      0 0 40px rgba(0,255,162,0.6),
+      inset 0 0 40px rgba(0,255,162,0.4);
+    opacity:0.15;
+    transition:0.08s linear;
+    pointer-events:none;
+    z-index:-3;
+  }
+
+  /* TOP NAV + HEADER */
+  header {
+    position:sticky;
+    top:0;
+    z-index:10;
+    backdrop-filter:var(--blur);
+    background:linear-gradient(180deg, rgba(4,8,20,0.92), rgba(4,8,20,0.8));
+    border-bottom:1px solid rgba(160,200,255,0.4);
+    box-shadow:var(--shadow);
+  }
+  .header-inner {
+    max-width:1600px;
+    margin:0 auto;
+    padding:18px 20px 16px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+  }
+  .brand {
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+  }
+  h1 { margin:0; font-size:28px; letter-spacing:0.7px; color:var(--gold); }
+  .sub { font-size:13px; color:#b8bfd4; }
+
+  .nav {
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+  }
+  .nav button {
+    padding:6px 10px;
+    font-size:12px;
+    border-radius:999px;
+    background:rgba(3,12,24,0.9);
+    border:1px solid rgba(160,200,255,0.4);
+    cursor:pointer;
+    color:#d6def8;
+    box-shadow:none;
+    letter-spacing:0.2px;
+  }
+  .nav button:hover { background:rgba(0,184,255,0.24); }
+
+  main {
+    padding:32px 20px 56px;
+    max-width:1600px;
+    margin:0 auto;
+  }
+
+  /* MAIN LAYOUT */
+  .layout {
+    display:grid;
+    grid-template-columns:minmax(0,2.1fr) minmax(0,1.2fr);
+    gap:32px;
+  }
+
+  .card {
+    background:var(--card);
+    backdrop-filter:var(--blur);
+    padding:24px;
+    border-radius:20px;
+    border:1px solid var(--card-border);
+    box-shadow:var(--shadow);
+    margin-bottom:24px;
+    position:relative;
+    overflow:hidden;
+    transition:transform 0.3s, border-color 0.3s, box-shadow 0.3s;
+  }
+  .card:hover { transform:translateY(-3px); border-color:var(--accent2); box-shadow:0 18px 46px rgba(0,0,0,0.9); }
+
+  .card::before {
+    content:"";
+    position:absolute;
+    inset:-1px;
+    border-radius:inherit;
+    background:conic-gradient(
+      from 220deg,
+      rgba(0,184,255,0.26),
+      rgba(0,255,162,0.26),
+      rgba(216,177,90,0.26),
+      rgba(0,184,255,0.26)
+    );
+    mix-blend-mode:screen;
+    opacity:0.12;
+    filter:blur(18px);
+    z-index:-1;
+  }
+
+  h2 { margin:0 0 14px; font-size:18px; color:var(--gold); letter-spacing:0.4px; }
+
+  label { font-size:13px; margin-bottom:6px; display:block; color:#c5cce3; }
+
+  input,select,textarea,button {
+    font-size:14px;
+    padding:10px 12px;
+    border-radius:10px;
+    border:1px solid rgba(160,200,255,0.3);
+    background:rgba(3,6,12,0.92);
+    color:var(--fg);
+    outline:none;
+    transition:border-color 0.25s, box-shadow 0.25s, background 0.25s;
+  }
+  input:focus,select:focus,textarea:focus {
+    border-color:var(--accent);
+    box-shadow:0 0 0 1px rgba(0,184,255,0.5);
+    background:rgba(6,12,20,0.96);
+  }
+  button {
+    cursor:pointer;
+    background:linear-gradient(120deg, var(--accent), var(--accent2));
+    border:none;
+    color:#fff;
+    font-weight:600;
+    letter-spacing:0.3px;
+    box-shadow:0 10px 26px rgba(0,184,255,0.45);
+  }
+  button:hover { transform:translateY(-1px); box-shadow:0 16px 30px rgba(0,184,255,0.6); }
+
+  .row { display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap; }
+  pre {
+    background:rgba(1,4,10,0.95);
+    border-radius:12px;
+    padding:12px;
+    font-size:12px;
+    border:1px solid rgba(160,200,255,0.22);
+    white-space:pre-wrap;
+    max-height:220px;
+    overflow:auto;
+  }
+
+  .progress-bar { width:100%; height:12px; border-radius:20px; overflow:hidden; background:rgba(5,12,16,0.9); box-shadow:inset 0 0 10px rgba(0,0,0,0.7); }
+  .progress-bar > div { height:100%; width:0%; background:linear-gradient(90deg,var(--accent),var(--accent2)); transition:width 0.2s; }
+
+  .badge { padding:5px 9px; border-radius:999px; font-size:11px; border:1px solid rgba(160,200,255,0.5); background:rgba(4,8,16,0.9); white-space:nowrap; }
+  .badge.ok { color:#6effb1; border-color:#6effb1; }
+  .badge.fail { color:var(--error); border-color:var(--error); }
+
+  /* NEON NODE MAP */
+  #node-map { display:flex; flex-wrap:wrap; gap:8px; }
+  .node {
+    padding:7px 10px;
+    border-radius:999px;
+    background:radial-gradient(circle at 10% 0%, rgba(0,255,162,0.26), rgba(5,10,18,1));
+    border:1px solid rgba(0,184,255,0.6);
+    font-size:11px;
+    position:relative;
+  }
+  .node::after {
+    content:"";
+    position:absolute;
+    inset:-1px;
+    border-radius:inherit;
+    border:1px solid rgba(0,184,255,0.4);
+    opacity:0.4;
+  }
+
+  /* FORENSIC PANEL */
+  #forensic { font-size:12px; line-height:1.5; }
+  #forensic .label { color:#8fa2ff; }
+
+  /* COMMAND PALETTE (⌘K / Ctrl+K) */
+  #cmdk {
+    position:fixed;
+    inset:0;
+    display:none;
+    align-items:flex-start;
+    justify-content:center;
+    padding-top:120px;
+    background:rgba(0,0,0,0.7);
+    backdrop-filter:blur(12px);
+    z-index:40;
+  }
+  #cmdk-panel {
+    width:min(600px, 100% - 32px);
+    background:#05070e;
+    border-radius:18px;
+    border:1px solid rgba(160,200,255,0.5);
+    box-shadow:var(--shadow);
+    padding:16px 16px 10px;
+  }
+  #cmdk-input { width:100%; margin-bottom:10px; }
+  #cmdk-list { max-height:260px; overflow:auto; font-size:14px; }
+  #cmdk-list div { padding:8px 6px; border-radius:8px; cursor:pointer; }
+  #cmdk-list div:hover { background:rgba(0,184,255,0.16); }
+
+  /* RESPONSIVE BREAKPOINTS */
+  @media (max-width: 1200px) {
+    .layout {
+      grid-template-columns:1fr;
+    }
+  }
+  @media (max-width: 900px) {
+    .header-inner { flex-direction:column; align-items:flex-start; }
+    .nav { justify-content:flex-start; }
+    main { padding:24px 16px 40px; }
+  }
+  @media (max-width: 640px) {
+    h1 { font-size:22px; }
+    .sub { font-size:12px; }
+    .card { padding:18px; }
+    pre { max-height:160px; }
+  }
+</style>
+</head>
+<body>
+<div id="bg-stars"></div>
+<div id="bg-grid"></div>
+<div id="fog-layer"></div>
+<div id="audio-ring"></div>
+
+<!-- COMMAND PALETTE -->
+<div id="cmdk">
+  <div id="cmdk-panel">
+    <input id="cmdk-input" placeholder="Type a command… (upload, job, proof, verify, kdm)" />
+    <div id="cmdk-list"></div>
+  </div>
+</div>
+
+<header>
+  <div class="header-inner">
+    <div class="brand">
+      <h1>QuickDCP — System Core</h1>
+      <div class="sub">Observatory · Lab · Neon Core · Zero‑Trust Vault</div>
+    </div>
+    <div class="nav">
+      <button onclick="scrollToSection('upload')">Upload</button>
+      <button onclick="scrollToSection('jobs')">Jobs</button>
+      <button onclick="scrollToSection('qc')">QC</button>
+      <button onclick="scrollToSection('proof')">Proof</button>
+      <button onclick="scrollToSection('worker')">Worker</button>
+      <button onclick="scrollToSection('kdm')">KDM</button>
+      <button onclick="scrollToSection('vault')">Vault</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="layout">
+    <!-- LEFT COLUMN: Upload / Jobs / QC / Proof -->
+    <div>
+      <section id="upload" class="card">
+        <h2>1. Upload Files</h2>
+        <label>Select Files</label>
+        <input type="file" id="files" multiple />
+        <button style="margin-top:8px;" onclick="uploadMultiple()">Upload</button>
+        <div id="upload_list" style="margin-top:10px;"></div>
+      </section>
+
+      <section id="jobs" class="card">
+        <h2>2. Jobs (Lab Console)</h2>
+        <div class="row">
+          <div style="flex:2; min-width:160px;">
+            <label>Job ID</label>
+            <input id="job_id" placeholder="JOB-001" />
+          </div>
+          <div style="flex:1; min-width:120px;">
+            <label>Resolution</label>
+            <select id="res">
+              <option value="2K">2K</option>
+              <option value="4K">4K</option>
+            </select>
+          </div>
+        </div>
+        <button onclick="renderJob()">Create Render Job</button>
+        <pre id="render_out"></pre>
+      </section>
+
+      <section id="qc" class="card">
+        <h2>3. QC & Status (Holographic)</h2>
+        <button onclick="pollJob()">Poll Current Job</button>
+        <pre id="poll_out"></pre>
+        <div id="qc_vis" class="card" style="margin-top:14px; padding:14px; background:rgba(5,18,22,0.92); box-shadow:none;">
+          <div>QC Graph (placeholder)</div>
+        </div>
+      </section>
+
+      <section id="proof" class="card">
+        <h2>4. Proof & Verify</h2>
+        <div class="row">
+          <button onclick="proofInit()">Init Proof (TSQ)</button>
+          <button onclick="fetchManifest()">Fetch Manifest</button>
+        </div>
+        <pre id="tsq_out"></pre>
+        <label style="margin-top:10px;">TSR (base64)</label>
+        <textarea id="tsr" rows="3"></textarea>
+        <button style="margin-top:8px;" onclick="ackTSA()">ACK TSA</button>
+        <pre id="tsr_out"></pre>
+
+        <label style="margin-top:10px;">Verify Reference</label>
+        <input id="verify_ref" placeholder="manifest_sha256 or JOB-ID" />
+        <button style="margin-top:6px;" onclick="verifyRef()">Verify</button>
+        <pre id="verify_out"></pre>
+      </section>
+    </div>
+
+    <!-- RIGHT COLUMN: Worker, Node Map, KDM Matrix, Forensic Vault -->
+    <div>
+      <section id="worker" class="card">
+        <h2>5. Worker Status</h2>
+        <div class="row">
+          <span class="badge" id="worker_state">checking…</span>
+          <button onclick="pingWorker()">Refresh</button>
+        </div>
+        <pre id="worker_out"></pre>
+      </section>
+
+      <section class="card">
+        <h2>6. Neon System Graph</h2>
+        <div id="node-map">
+          <div class="node">Upload</div>
+          <div class="node">Ingest S3</div>
+          <div class="node">Worker Queue</div>
+          <div class="node">Encode/QC</div>
+          <div class="node">Manifest</div>
+          <div class="node">TSA</div>
+          <div class="node">FilmPassport</div>
+          <div class="node">Verify API</div>
+          <div class="node">Vault</div>
+          <div class="node">KDM</div>
+        </div>
+      </section>
+
+      <section id="kdm" class="card">
+        <h2>7. KDM Matrix (Batch)</h2>
+        <label>Recipient Certificates (one per line)</label>
+        <textarea id="kdm_batch" rows="4"></textarea>
+        <div class="row" style="margin-top:10px;">
+          <div style="flex:1; min-width:140px;">
+            <label>Valid From</label>
+            <input type="datetime-local" id="valid_from" />
+          </div>
+          <div style="flex:1; min-width:140px;">
+            <label>Valid Until</label>
+            <input type="datetime-local" id="valid_until" />
+          </div>
+        </div>
+        <button onclick="kdmBatch()">Generate KDM Preview</button>
+        <div class="row" id="kdm_grid" style="margin-top:10px; flex-wrap:wrap;"></div>
+        <pre id="kdm_out"></pre>
+      </section>
+
+      <section id="vault" class="card">
+        <h2>8. Zero‑Trust Vault (Forensic)</h2>
+        <div id="forensic">
+          <div><span class="label">Last Manifest Hash:</span> <span id="fz_hash">—</span></div>
+          <div><span class="label">TSA Status:</span> <span id="fz_tsa">—</span></div>
+          <div><span class="label">FP Verification:</span> <span id="fz_fp">—</span></div>
+          <div><span class="label">Object Lock:</span> <span id="fz_lock">—</span></div>
+          <div><span class="label">Lineage Chain:</span> <span id="fz_lineage">—</span></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<script>
+const CUST = "demo";
+const KEY = "demo";
+
+// Smooth scroll nav
+function scrollToSection(id){
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+// AUDIO REACTIVE RING
+let analyser, dataArray;
+async function setupAudioReactive(){
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const source = audioCtx.createMediaStreamSource(stream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    dataArray = new Uint8Array(analyser.frequencyBinCount);
+    source.connect(analyser);
+    animateRing();
+  } catch(e) {}
+}
+function animateRing(){
+  requestAnimationFrame(animateRing);
+  if (!analyser) return;
+  analyser.getByteFrequencyData(dataArray);
+  const avg = dataArray.reduce((a,b)=>a+b,0) / dataArray.length;
+  const ring = document.getElementById('audio-ring');
+  const scale = 0.5 + (avg/255)*0.7;
+  ring.style.transform = `translate(-50%, -50%) scale(${scale})`;
+  ring.style.opacity = 0.1 + (avg/255)*0.5;
+}
+setupAudioReactive();
+
+// COMMAND PALETTE
+const cmdk = document.getElementById('cmdk');
+const cmdInput = document.getElementById('cmdk-input');
+const cmdList = document.getElementById('cmdk-list');
+const commands = [
+  {label:'Upload files', fn:'uploadMultiple'},
+  {label:'Create render job', fn:'renderJob'},
+  {label:'Poll current job', fn:'pollJob'},
+  {label:'Init proof', fn:'proofInit'},
+  {label:'Fetch manifest', fn:'fetchManifest'},
+  {label:'Verify reference', fn:'verifyRef'},
+  {label:'KDM batch preview', fn:'kdmBatch'}
+];
+
+function openCmd(){ cmdk.style.display='flex'; cmdInput.value=''; renderCmdList(''); cmdInput.focus(); }
+function closeCmd(){ cmdk.style.display='none'; }
+function renderCmdList(q){
+  const ql = q.toLowerCase();
+  cmdList.innerHTML='';
+  commands
+    .filter(c=>c.label.toLowerCase().includes(ql))
+    .forEach(c=>{
+      const div = document.createElement('div');
+      div.textContent = c.label;
+      div.onclick = ()=>{ closeCmd(); if (window[c.fn]) window[c.fn](); };
+      cmdList.appendChild(div);
+    });
+}
+cmdInput.addEventListener('input', e=>renderCmdList(e.target.value));
+window.addEventListener('keydown', e=>{
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase()==='k') { e.preventDefault(); cmdk.style.display==='flex' ? closeCmd() : openCmd(); }
+  if (e.key==='Escape' && cmdk.style.display==='flex') closeCmd();
+});
+
+// SIMPLE STUBS FOR CORE ACTIONS (wire to API later)
+async function uploadMultiple(){
+  const files = [...document.getElementById('files').files];
+  const list = document.getElementById('upload_list');
+  list.innerHTML='';
+  for(const f of files){
+    const row = document.createElement('div');
+    row.style.marginBottom = '8px';
+    row.innerHTML = `<div style="font-size:12px;opacity:0.9;">${f.name}</div><div class="progress-bar"><div></div></div>`;
+    list.appendChild(row);
+    const bar = row.querySelector('.progress-bar > div');
+    let p = 0; const id = setInterval(()=>{ p+=10; bar.style.width=p+'%'; if(p>=100) clearInterval(id); },50);
+  }
+}
+
+function renderJob(){
+  const jobId = document.getElementById('job_id').value || 'JOB-001';
+  const res = document.getElementById('res').value;
+  document.getElementById('render_out').textContent = `Job scheduled: ${jobId} (${res})`;
+}
+
+function pollJob(){
+  document.getElementById('poll_out').textContent = 'Polling job… (wire to /jobs/:id)';
+}
+
+function proofInit(){
+  document.getElementById('tsq_out').textContent = 'Proof init requested (wire to /proof/init)';
+}
+
+function fetchManifest(){
+  document.getElementById('tsq_out').textContent += '\nFetch manifest (wire to /jobs/:id)';
+}
+
+function ackTSA(){
+  document.getElementById('tsr_out').textContent = 'TSR received (wire to /proof/ack/tsa)';
+}
+
+function verifyRef(){
+  const ref = document.getElementById('verify_ref').value;
+  document.getElementById('verify_out').textContent = `Verify ${ref} (wire to /verify/:ref)`;
+}
+
+function kdmBatch(){
+  const raw = document.getElementById('kdm_batch').value.trim().split(/\n+/).filter(Boolean);
+  const grid = document.getElementById('kdm_grid');
+  grid.innerHTML='';
+  raw.forEach((line,i)=>{
+    const cell = document.createElement('div');
+    cell.className='badge';
+    cell.textContent = `KDM ${i+1}`;
+    grid.appendChild(cell);
+  });
+  document.getElementById('kdm_out').textContent = `Prepared ${raw.length} KDM entries (wire to /kdm/preview)`;
+}
+
+function pingWorker(){
+  const el = document.getElementById('worker_state');
+  el.classList.add('ok');
+  el.textContent = 'online (stub)';
+  document.getElementById('worker_out').textContent = 'Worker ping (wire to /internal/health)';
+}
+</script>
+</body>
+</html>

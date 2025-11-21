@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>QuickDCP — About</title>
+
+  <style>
+    :root {
+      --bg: #020307;
+      --fg: #e8eaf5;
+      --muted: #9aa3ba;
+      --card: rgba(8,12,20,0.9);
+      --card-border: rgba(160,200,255,0.28);
+      --accent: #00b8ff;
+      --accent2: #00ffa2;
+      --gold: #d8b15a;
+      --shadow: 0 16px 42px rgba(0,0,0,0.85);
+      --blur: blur(22px);
+    }
+
+    * { box-sizing:border-box; }
+
+    body {
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+      background:var(--bg);
+      color:var(--fg);
+      overflow-x:hidden;
+      animation:screen-on 1s ease;
+    }
+
+    @keyframes screen-on {
+      0% { filter:brightness(0) blur(10px); opacity:0; }
+      40% { filter:brightness(0.25) blur(3px); opacity:1; }
+      100% { filter:brightness(1) blur(0); }
+    }
+
+    /* BACKGROUND: STARFIELD + NEON GRID */
+    #bg-stars, #bg-grid {
+      position:fixed;
+      inset:0;
+      z-index:-6;
+    }
+    #bg-stars {
+      background:
+        radial-gradient(circle at 10% 20%, rgba(255,255,255,0.15), transparent 55%),
+        radial-gradient(circle at 80% 10%, rgba(0,255,255,0.16), transparent 55%),
+        radial-gradient(circle at 50% 90%, rgba(216,177,90,0.16), transparent 55%),
+        #020307;
+    }
+    #bg-grid::after {
+      content:"";
+      position:absolute;
+      inset:0;
+      background-image:
+        linear-gradient(rgba(0,255,255,0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,255,255,0.08) 1px, transparent 1px);
+      background-size:40px 40px;
+      transform:perspective(260px) rotateX(62deg) translateY(160px);
+      opacity:0.22;
+      animation:grid-shift 26s linear infinite;
+    }
+    @keyframes grid-shift {
+      0% { transform:perspective(260px) rotateX(62deg) translateY(160px); }
+      100% { transform:perspective(260px) rotateX(62deg) translateY(-220px); }
+    }
+
+    #fog-layer {
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+      background:radial-gradient(circle at 50% 35%, rgba(255,255,255,0.08), transparent 70%);
+      mix-blend-mode:screen;
+      animation:fogflow 24s ease-in-out infinite alternate;
+      z-index:-5;
+    }
+    @keyframes fogflow {
+      0% { transform:translate(-16px,-12px) scale(1.02); opacity:0.32; }
+      100% { transform:translate(24px,18px) scale(1.07); opacity:0.7; }
+    }
+
+    /* HEADER */
+    header {
+      position:sticky;
+      top:0;
+      z-index:10;
+      backdrop-filter:var(--blur);
+      background:linear-gradient(180deg, rgba(4,8,20,0.96), rgba(4,8,20,0.82));
+      border-bottom:1px solid rgba(160,200,255,0.45);
+      box-shadow:var(--shadow);
+    }
+    .header-inner {
+      max-width:1100px;
+      margin:0 auto;
+      padding:18px 18px 16px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+    }
+    .brand { display:flex; flex-direction:column; gap:4px; }
+    h1 { margin:0; font-size:24px; color:var(--gold); letter-spacing:0.6px; }
+    .sub { font-size:13px; color:var(--muted); }
+
+    .nav {
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      font-size:12px;
+    }
+    .nav a {
+      text-decoration:none;
+      color:#cfd6ff;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid rgba(160,200,255,0.4);
+      background:rgba(3,10,20,0.92);
+    }
+    .nav a:hover { background:rgba(0,184,255,0.24); }
+
+    main {
+      max-width:1100px;
+      margin:0 auto;
+      padding:28px 18px 72px;
+    }
+
+    .card {
+      background:var(--card);
+      border-radius:22px;
+      border:1px solid var(--card-border);
+      box-shadow:var(--shadow);
+      padding:22px 20px 20px;
+      margin-bottom:22px;
+      position:relative;
+      overflow:hidden;
+    }
+    .card::before {
+      content:"";
+      position:absolute;
+      inset:-1px;
+      border-radius:inherit;
+      background:conic-gradient(from 220deg,
+        rgba(0,184,255,0.25),
+        rgba(0,255,162,0.25),
+        rgba(216,177,90,0.25),
+        rgba(0,184,255,0.25));
+      mix-blend-mode:screen;
+      filter:blur(18px);
+      opacity:0.12;
+      z-index:-1;
+    }
+
+    h2 { margin:0 0 10px; font-size:18px; color:var(--gold); }
+
+    p { margin:6px 0 10px; font-size:14px; line-height:1.6; color:var(--fg); }
+    .muted { color:var(--muted); }
+
+    .pill-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
+    .pill {
+      font-size:12px;
+      padding:4px 10px;
+      border-radius:999px;
+      border:1px solid rgba(160,200,255,0.5);
+      background:rgba(3,10,20,0.95);
+      color:#dde4ff;
+    }
+
+    ul { margin:6px 0 6px 18px; padding:0; font-size:14px; color:var(--muted); }
+    li { margin-bottom:4px; }
+
+    .cols {
+      display:grid;
+      grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);
+      gap:18px;
+    }
+
+    .small { font-size:12px; color:var(--muted); margin-top:6px; }
+
+    code { font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:12px; }
+
+    @media (max-width: 860px) {
+      .header-inner { flex-direction:column; align-items:flex-start; }
+      .cols { grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+<body>
+<div id="bg-stars"></div>
+<div id="bg-grid"></div>
+<div id="fog-layer"></div>
+
+<header>
+  <div class="header-inner">
+    <div class="brand">
+      <h1>QuickDCP — About</h1>
+      <div class="sub">What this node does, how it protects masters, and how to integrate it</div>
+    </div>
+    <nav class="nav">
+      <a href="/">System Core</a>
+      <a href="/verify.html">Verify</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#security">Security</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="card">
+    <h2>QuickDCP in one paragraph</h2>
+    <p>
+      QuickDCP is a focused pipeline for turning mezzanine picture, audio, and subtitles into
+      cinema‑ready DCPs with a cryptographically verifiable proof chain. This node is the
+      local control surface: you upload assets, launch jobs, monitor workers, and publish
+      proofs that festivals and cinemas can verify independently.
+    </p>
+    <div class="pill-row">
+      <div class="pill">FFmpeg / OpenDCP based encoding</div>
+      <div class="pill">S3 ingest + out buckets</div>
+      <div class="pill">Time‑stamp authority (TSA) proofs</div>
+      <div class="pill">FilmPassport integration</div>
+      <div class="pill">Zero‑trust storage model</div>
+    </div>
+  </section>
+
+  <section id="architecture" class="card cols">
+    <div>
+      <h2>Node architecture</h2>
+      <p class="muted">How this node fits between your editorial tools and the cinema server.</p>
+      <ul>
+        <li><strong>Ingest.</strong> Files land in an S3 ingest bucket via multipart upload.</li>
+        <li><strong>Jobs.</strong> The API records render jobs, profiles, and customers in Postgres.</li>
+        <li><strong>Worker.</strong> A stateless worker pulls jobs, runs ffmpeg / OpenDCP, and writes DCP packages.</li>
+        <li><strong>Manifests.</strong> Each job emits a signed manifest JSON with hashes for all reels and assets.</li>
+        <li><strong>Proofs.</strong> Manifests are locked by TSA + FilmPassport so anyone can prove they were not tampered with.</li>
+      </ul>
+      <p class="small">The <code>/public/index.html</code> console is just one client of the API. SDKs and CI can call the same endpoints.</p>
+    </div>
+    <div>
+      <h2>Designed for operators</h2>
+      <p>
+        The System Core layout mirrors how facilities actually work: separate panels for ingest,
+        queue, QC, proof, and KDM. Everything you see on the dashboard is backed by a simple
+        HTTP API so it can be automated or embedded into your own UIs.
+      </p>
+      <ul>
+        <li>Fast manual checks when you are on a projector or laptop.</li>
+        <li>Scriptable via Python / Node SDKs.</li>
+        <li>Safe defaults: encrypted buckets, object lock, minimal secrets.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="security" class="card cols">
+    <div>
+      <h2>Security & proof chain</h2>
+      <p>
+        QuickDCP assumes that storage, operators, and even this UI may eventually be compromised.
+        Instead of trusting any single component, it builds a chain of cryptographic anchors
+        that can be verified from the outside.
+      </p>
+      <ul>
+        <li>TSA proof binds manifest hash to a public time‑stamp.</li>
+        <li>FilmPassport (or similar) records provide an external proof of possession.</li>
+        <li>S3 Object Lock ensures manifests and proofs cannot be rewritten silently.</li>
+        <li>Verify API is read‑only and can be exposed publicly.</li>
+      </ul>
+    </div>
+    <div>
+      <h2>What the Verify page does</h2>
+      <p class="muted">
+        <a href="/verify.html" style="color:#cfd6ff;">verify.html</a> is the public entry point for festivals,
+        distributors, and cinemas:
+      </p>
+      <ul>
+        <li>Accepts a <code>job_id</code> or manifest SHA‑256.</li>
+        <li>Queries <code>/verify/&lt;ref&gt;</code> and shows status.</li>
+        <li>Generates a curl snippet and QR deep link.</li>
+        <li>Makes it easy to compare hashes with content on the projector.</li>
+      </ul>
+      <p class="small">You can host verify.html on a separate origin or CDN and point it at a hardened Verify API.</p>
+    </div>
+  </section>
+
+  <section id="faq" class="card">
+    <h2>FAQ</h2>
+    <p><strong>Is this a full mastering system?</strong><br>
+       No. QuickDCP is the pipeline and proof layer. It expects graded, conformed picture and audio from
+       Resolve, Premiere, or your internal tools.</p>
+
+    <p><strong>Can I run multiple workers?</strong><br>
+       Yes. Workers are stateless. Point several workers at the same queue database and S3 buckets to scale out.
+    </p>
+
+    <p><strong>Where do KDMs fit?</strong><br>
+       The KDM Matrix in the System Core is a preview surface. Actual KDM generation uses your keys and certificate
+       authority; this UI is designed to integrate with that, not replace it.</p>
+
+    <p><strong>Can festivals verify without talking to me?</strong><br>
+       Yes. If they have the manifest hash or job id and access to the Verify API, they can prove whether a DCP on
+       disk matches what you generated.</p>
+
+    <p class="small">For detailed integration notes, see the SDK docs and the <code>/docs/dcp-proof-chain.html</code> explainer.</p>
+  </section>
+</main>
+
+</body>
+</html>

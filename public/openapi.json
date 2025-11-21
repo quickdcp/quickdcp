@@ -1,0 +1,980 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "QuickDCP API",
+    "version": "0.1.0",
+    "description": "Private API for QuickDCP System Core: jobs, upload, proof chain, verification, billing and worker control."
+  },
+  "servers": [
+    {
+      "url": "https://api.quickdcp.local",
+      "description": "Local QuickDCP node"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "Customer": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-QD-Customer",
+        "description": "Customer identifier for multi-tenant setups."
+      },
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "QuickDCP API key, formatted as `QuickDCP <api-key>`."
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "detail": {
+            "type": "string"
+          }
+        }
+      },
+      "RenderProfile": {
+        "type": "object",
+        "properties": {
+          "res": {
+            "type": "string",
+            "description": "e.g. 2K, 4K"
+          },
+          "shape": {
+            "type": "string",
+            "description": "e.g. FLAT, SCOPE"
+          },
+          "extras": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "RenderRequest": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "input_key": {
+            "type": "string",
+            "nullable": true,
+            "description": "S3 key or path of uploaded asset."
+          },
+          "profile": {
+            "$ref": "#/components/schemas/RenderProfile"
+          }
+        },
+        "required": [
+          "profile"
+        ]
+      },
+      "RenderResponse": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "status"
+        ]
+      },
+      "JobSummary": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "status"
+        ]
+      },
+      "ManifestQC": {
+        "type": "object",
+        "properties": {
+          "audio_lufs": {
+            "type": "number",
+            "nullable": true
+          },
+          "video_issues": {
+            "type": "integer",
+            "nullable": true
+          },
+          "subtitle_sync_ms": {
+            "type": "integer",
+            "nullable": true
+          }
+        }
+      },
+      "Manifest": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string"
+          },
+          "profile": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "outputs": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "qc": {
+            "$ref": "#/components/schemas/ManifestQC"
+          },
+          "proof": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "job_id"
+        ]
+      },
+      "WorkerNextResponse": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "profile": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true
+          },
+          "status": {
+            "type": "string",
+            "description": "EMPTY, QUEUED, PROCESSING"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "WorkerUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string"
+          },
+          "manifest": {
+            "$ref": "#/components/schemas/Manifest"
+          },
+          "status": {
+            "type": "string",
+            "description": "PASS, FAIL, PROCESSING, QUEUED"
+          }
+        },
+        "required": [
+          "job_id",
+          "manifest",
+          "status"
+        ]
+      },
+      "ProofInitReq": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id"
+        ]
+      },
+      "ProofInitRes": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string"
+          },
+          "manifest_sha256": {
+            "type": "string",
+            "description": "Hex SHA256 of canonical manifest."
+          },
+          "tsq_der": {
+            "type": "string",
+            "description": "Base64-encoded TSQ (DER)."
+          }
+        },
+        "required": [
+          "job_id",
+          "manifest_sha256",
+          "tsq_der"
+        ]
+      },
+      "ProofAckReq": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string"
+          },
+          "tsr_base64": {
+            "type": "string",
+            "description": "Base64-encoded TSR (DER)."
+          },
+          "tsa_cert_pem": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "job_id",
+          "tsr_base64"
+        ]
+      },
+      "ProofStatusRes": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "description": "PENDING or TSA_OK."
+          },
+          "manifest_sha256": {
+            "type": "string"
+          },
+          "tsa_ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "job_id",
+          "status",
+          "manifest_sha256",
+          "tsa_ok"
+        ]
+      },
+      "VerifyResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "VALID, PENDING or NOT_FOUND"
+          },
+          "job_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "manifest_sha256": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "UploadInitRequest": {
+        "type": "object",
+        "properties": {
+          "object_key": {
+            "type": "string",
+            "description": "Desired S3 object key."
+          },
+          "parts": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "object_key",
+          "parts"
+        ]
+      },
+      "UploadInitResponse": {
+        "type": "object",
+        "properties": {
+          "upload_id": {
+            "type": "string"
+          },
+          "bucket": {
+            "type": "string"
+          },
+          "object_key": {
+            "type": "string"
+          },
+          "part_urls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "part_number": {
+                  "type": "integer"
+                },
+                "url": {
+                  "type": "string",
+                  "format": "uri"
+                }
+              },
+              "required": [
+                "part_number",
+                "url"
+              ]
+            }
+          }
+        },
+        "required": [
+          "upload_id",
+          "bucket",
+          "object_key",
+          "part_urls"
+        ]
+      },
+      "UploadCompletePart": {
+        "type": "object",
+        "properties": {
+          "part_number": {
+            "type": "integer"
+          },
+          "etag": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "part_number",
+          "etag"
+        ]
+      },
+      "UploadCompleteRequest": {
+        "type": "object",
+        "properties": {
+          "upload_id": {
+            "type": "string"
+          },
+          "object_key": {
+            "type": "string"
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UploadCompletePart"
+            }
+          }
+        },
+        "required": [
+          "upload_id",
+          "object_key",
+          "parts"
+        ]
+      },
+      "BillingUsageRecord": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "minutes": {
+            "type": "number",
+            "description": "Rounded encoder minutes for billing."
+          },
+          "amount_cents": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "job_id",
+          "status",
+          "minutes",
+          "amount_cents"
+        ]
+      },
+      "KDMPreviewRequest": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string"
+          },
+          "certificates": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "PEM-encoded public certificates, one per recipient."
+          },
+          "valid_from": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "valid_until": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "days": {
+            "type": "integer",
+            "nullable": true
+          }
+        },
+        "required": [
+          "job_id",
+          "certificates"
+        ]
+      },
+      "KDMRecord": {
+        "type": "object",
+        "properties": {
+          "recipient": {
+            "type": "string"
+          },
+          "not_before": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "not_after": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fingerprint": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "recipient",
+          "not_before",
+          "not_after",
+          "fingerprint",
+          "status"
+        ]
+      },
+      "HealthStatus": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "uptime_seconds": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      }
+    }
+  },
+  "security": [
+    {
+      "Customer": [],
+      "ApiKeyAuth": []
+    }
+  ],
+  "paths": {
+    "/jobs/render": {
+      "post": {
+        "summary": "Create a render job",
+        "operationId": "createRenderJob",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Job created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenderResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs": {
+      "get": {
+        "summary": "List jobs",
+        "operationId": "listJobs",
+        "responses": {
+          "200": {
+            "description": "List of jobs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/JobSummary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs/{job_id}": {
+      "get": {
+        "summary": "Get job status or manifest",
+        "operationId": "getJob",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job status (if manifest locked) or full manifest once TSA is OK.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/JobSummary"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Manifest"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/next-job": {
+      "post": {
+        "summary": "Worker: fetch next job",
+        "operationId": "workerNextJob",
+        "parameters": [
+          {
+            "name": "X-Worker-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Next job for worker, or EMPTY.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkerNextResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bad token"
+          }
+        },
+        "security": []
+      }
+    },
+    "/internal/update-job": {
+      "post": {
+        "summary": "Worker: update job manifest and status",
+        "operationId": "workerUpdateJob",
+        "parameters": [
+          {
+            "name": "X-Worker-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkerUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Job updated"
+          },
+          "401": {
+            "description": "Bad token"
+          },
+          "404": {
+            "description": "Job not found"
+          }
+        },
+        "security": []
+      }
+    },
+    "/proof/init": {
+      "post": {
+        "summary": "Initialize TSA proof for a job",
+        "operationId": "proofInit",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProofInitReq"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Proof initialized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProofInitRes"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found"
+          }
+        }
+      }
+    },
+    "/proof/ack/tsa": {
+      "post": {
+        "summary": "Acknowledge TSA response for a job",
+        "operationId": "proofAckTsa",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProofAckReq"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TSA proof stored and verified",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProofStatusRes"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid TSA response"
+          },
+          "404": {
+            "description": "Job not found"
+          }
+        }
+      }
+    },
+    "/proof/status/{job_id}": {
+      "get": {
+        "summary": "Get proof status for a job",
+        "operationId": "proofStatus",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Proof status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProofStatusRes"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found"
+          }
+        }
+      }
+    },
+    "/verify/{ref}": {
+      "get": {
+        "summary": "Public verify by job id or manifest SHA-256",
+        "operationId": "verifyRef",
+        "parameters": [
+          {
+            "name": "ref",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Verification result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Reference not found"
+          }
+        },
+        "security": []
+      }
+    },
+    "/upload/init": {
+      "post": {
+        "summary": "Initialize multipart upload to ingest bucket",
+        "operationId": "uploadInit",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadInitRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Multipart upload initialized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadInitResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/upload/complete": {
+      "post": {
+        "summary": "Complete multipart upload with part ETags",
+        "operationId": "uploadComplete",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadCompleteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Object finalized in ingest bucket"
+          },
+          "400": {
+            "description": "Invalid upload_id or parts"
+          }
+        }
+      }
+    },
+    "/upload/head/{object_key}": {
+      "get": {
+        "summary": "HEAD-style existence check for uploaded object",
+        "operationId": "uploadHead",
+        "parameters": [
+          {
+            "name": "object_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Object exists"
+          },
+          "404": {
+            "description": "Object not found"
+          }
+        }
+      }
+    },
+    "/billing/usage": {
+      "get": {
+        "summary": "List usage records for billing",
+        "operationId": "billingUsage",
+        "responses": {
+          "200": {
+            "description": "Usage records derived from completed jobs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BillingUsageRecord"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/kdm/preview": {
+      "post": {
+        "summary": "Preview KDM matrix for a job and recipients",
+        "operationId": "kdmPreview",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KDMPreviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "KDM records (preview only, not signed)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/KDMRecord"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid window or certificates"
+          },
+          "404": {
+            "description": "Job not found"
+          }
+        }
+      }
+    },
+    "/kdm/list/{job_id}": {
+      "get": {
+        "summary": "List KDM records stored on manifest",
+        "operationId": "kdmList",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stored KDM entries on manifest.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/KDMRecord"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found"
+          }
+        }
+      }
+    },
+    "/internal/health": {
+      "get": {
+        "summary": "Node health",
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "description": "Health information.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatus"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    }
+  }
+}

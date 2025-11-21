@@ -1,77 +1,317 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8" />
-  <title>QuickDCP - DCP Proof Chain Guide</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>QuickDCP — DCP Proof Chain Guide</title>
   <meta name="description" content="End-to-end guide for QuickDCP timestamped proof chain (RFC-3161)" />
+
   <style>
     :root {
-      --bg: #0b0b0c; --card: #121216; --ink: #e8e8ee; --muted: #a4a6ad; --gold: #d8b15a;
-      --ok: #2ecc71; --warn: #f1c40f; --err: #e74c3c; --link: #00a9a5;
+      --bg: #020307;
+      --fg: #e8eaf5;
+      --muted: #9aa3ba;
+      --card: rgba(8,12,20,0.9);
+      --card-border: rgba(160,200,255,0.28);
+      --accent: #00b8ff;
+      --accent2: #00ffa2;
+      --gold: #d8b15a;
+      --ok: #2ecc71;
+      --warn: #f1c40f;
+      --err: #ff4d6a;
+      --shadow: 0 16px 42px rgba(0,0,0,0.85);
+      --blur: blur(22px);
     }
-    * { box-sizing: border-box }
-    body { margin: 0; background: var(--bg); color: var(--ink); font-family: ui-sans-serif, system-ui, Segoe UI, Roboto, Helvetica, Arial, Apple Color Emoji, Segoe UI Emoji; }
-    header { padding: 28px 20px; border-bottom: 1px solid #1c1d22; position: sticky; top: 0; backdrop-filter: blur(6px); background: rgba(11,11,12,0.7) }
-    header h1 { margin: 0; font-size: 22px; letter-spacing: .4px }
-    header .sub { color: var(--muted); font-size: 13px; margin-top: 6px }
-    main { max-width: 1100px; margin: 0 auto; padding: 26px 20px 60px }
-    .grid { display: grid; gap: 16px; grid-template-columns: repeat(12, 1fr) }
-    .card { background: var(--card); border: 1px solid #1c1d22; border-radius: 14px; padding: 16px }
-    .span-12 { grid-column: span 12 }
-    .span-6 { grid-column: span 6 }
-    .span-4 { grid-column: span 4 }
-    .muted { color: var(--muted) }
-    h2 { margin: 6px 0 10px; font-size: 18px }
-    h3 { margin: 8px 0 6px; font-size: 15px; color: var(--gold) }
-    code, pre { background: #0d0e12; color: #e8e8ee; border: 1px solid #22232a; border-radius: 10px }
-    pre { padding: 12px; overflow: auto }
-    code.inline { padding: 2px 6px; border-radius: 6px }
-    a { color: var(--link); text-decoration: none }
-    a:hover { text-decoration: underline }
-    .tag { display: inline-block; font-size: 11px; padding: 2px 8px; border: 1px solid #23242b; border-radius: 999px; color: var(--muted); margin-right: 6px }
-    .ok { color: var(--ok) }
-    .err { color: var(--err) }
-    details { border: 1px solid #1c1d22; border-radius: 12px; padding: 10px 12px; background: #0e0f13 }
-    details + details { margin-top: 12px }
-    .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; padding: 2px 6px; border: 1px solid #44465a; border-radius: 6px; background: #0d0e12 }
-    .flex { display: flex; gap: 8px; align-items: center }
-    .btn { background: #171922; color: #e8e8ee; border: 1px solid #272838; border-radius: 10px; padding: 8px 10px; font-size: 13px; cursor: pointer }
-    .btn:hover { border-color: #3a3c57 }
-    input, textarea, select { width: 100%; background: #0d0e12; color: #e8e8ee; border: 1px solid #23242b; border-radius: 10px; padding: 8px 10px; font-size: 13px }
-    textarea { min-height: 120px }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace }
-    .pill { padding: 2px 8px; border-radius: 999px; border: 1px solid #2a2b36; font-size: 11px; color: var(--muted) }
+
+    * { box-sizing:border-box; }
+
+    body {
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+      background:var(--bg);
+      color:var(--fg);
+      overflow-x:hidden;
+      animation:screen-on 1s ease;
+    }
+
+    @keyframes screen-on {
+      0% { filter:brightness(0) blur(10px); opacity:0; }
+      40% { filter:brightness(0.25) blur(3px); opacity:1; }
+      100% { filter:brightness(1) blur(0); }
+    }
+
+    /* BACKGROUND: STARFIELD + NEON GRID */
+    #bg-stars, #bg-grid {
+      position:fixed;
+      inset:0;
+      z-index:-6;
+    }
+    #bg-stars {
+      background:
+        radial-gradient(circle at 10% 20%, rgba(255,255,255,0.15), transparent 55%),
+        radial-gradient(circle at 80% 10%, rgba(0,255,255,0.16), transparent 55%),
+        radial-gradient(circle at 50% 90%, rgba(216,177,90,0.16), transparent 55%),
+        #020307;
+    }
+    #bg-grid::after {
+      content:"";
+      position:absolute;
+      inset:0;
+      background-image:
+        linear-gradient(rgba(0,255,255,0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,255,255,0.08) 1px, transparent 1px);
+      background-size:40px 40px;
+      transform:perspective(260px) rotateX(62deg) translateY(160px);
+      opacity:0.22;
+      animation:grid-shift 26s linear infinite;
+    }
+    @keyframes grid-shift {
+      0% { transform:perspective(260px) rotateX(62deg) translateY(160px); }
+      100% { transform:perspective(260px) rotateX(62deg) translateY(-220px); }
+    }
+
+    /* VOLUMETRIC FOG */
+    #fog-layer {
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+      background:radial-gradient(circle at 50% 35%, rgba(255,255,255,0.08), transparent 70%);
+      mix-blend-mode:screen;
+      animation:fogflow 24s ease-in-out infinite alternate;
+      z-index:-5;
+    }
+    @keyframes fogflow {
+      0% { transform:translate(-16px,-12px) scale(1.02); opacity:0.32; }
+      100% { transform:translate(24px,18px) scale(1.07); opacity:0.7; }
+    }
+
+    /* HEADER */
+    header {
+      position:sticky;
+      top:0;
+      z-index:10;
+      backdrop-filter:var(--blur);
+      background:linear-gradient(180deg, rgba(4,8,20,0.96), rgba(4,8,20,0.82));
+      border-bottom:1px solid rgba(160,200,255,0.45);
+      box-shadow:var(--shadow);
+    }
+    .header-inner {
+      max-width:1100px;
+      margin:0 auto;
+      padding:18px 18px 16px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+    }
+    .brand { display:flex; flex-direction:column; gap:4px; }
+    h1 { margin:0; font-size:24px; color:var(--gold); letter-spacing:0.6px; }
+    .sub { font-size:13px; color:var(--muted); }
+
+    .nav {
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      font-size:12px;
+    }
+    .nav a {
+      text-decoration:none;
+      color:#cfd6ff;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid rgba(160,200,255,0.4);
+      background:rgba(3,10,20,0.92);
+    }
+    .nav a:hover { background:rgba(0,184,255,0.24); }
+
+    main {
+      max-width:1100px;
+      margin:0 auto;
+      padding:26px 18px 72px;
+    }
+
+    .grid {
+      display:grid;
+      gap:16px;
+      grid-template-columns:repeat(12, minmax(0,1fr));
+    }
+
+    .card {
+      background:var(--card);
+      border-radius:20px;
+      border:1px solid var(--card-border);
+      box-shadow:var(--shadow);
+      padding:18px 16px 16px;
+      position:relative;
+      overflow:hidden;
+    }
+    .card::before {
+      content:"";
+      position:absolute;
+      inset:-1px;
+      border-radius:inherit;
+      background:conic-gradient(from 220deg,
+        rgba(0,184,255,0.25),
+        rgba(0,255,162,0.25),
+        rgba(216,177,90,0.25),
+        rgba(0,184,255,0.25));
+      mix-blend-mode:screen;
+      filter:blur(18px);
+      opacity:0.12;
+      z-index:-1;
+    }
+
+    .span-12 { grid-column:span 12; }
+    .span-8 { grid-column:span 8; }
+    .span-6 { grid-column:span 6; }
+    .span-4 { grid-column:span 4; }
+
+    h2 { margin:4px 0 10px; font-size:18px; color:var(--gold); }
+    h3 { margin:8px 0 6px; font-size:15px; color:var(--gold); }
+
+    p { margin:6px 0 10px; font-size:14px; line-height:1.6; color:var(--fg); }
+    .muted { color:var(--muted); }
+
+    .tag {
+      display:inline-block;
+      font-size:11px;
+      padding:2px 8px;
+      border:1px solid rgba(42,43,54,0.9);
+      border-radius:999px;
+      color:var(--muted);
+      margin-right:6px;
+      margin-top:4px;
+    }
+
+    ul { margin:6px 0 6px 18px; padding:0; font-size:14px; color:var(--muted); }
+    li { margin-bottom:4px; }
+
+    code, pre {
+      background:rgba(1,4,10,0.96);
+      color:#e2e7ff;
+      border-radius:10px;
+      border:1px solid rgba(34,35,42,0.9);
+      font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size:12px;
+    }
+    code.inline { padding:2px 6px; }
+    pre { padding:12px; overflow:auto; }
+
+    .pill {
+      padding:2px 8px;
+      border-radius:999px;
+      border:1px solid rgba(42,43,54,0.9);
+      font-size:11px;
+      color:var(--muted);
+    }
+
+    .ok { color:var(--ok); }
+    .err { color:var(--err); }
+
+    details {
+      border:1px solid rgba(28,29,34,0.9);
+      border-radius:12px;
+      padding:8px 10px;
+      background:rgba(14,15,19,0.96);
+      font-size:14px;
+      color:var(--muted);
+    }
+    details + details { margin-top:10px; }
+
+    .btn {
+      background:linear-gradient(120deg,var(--accent),var(--accent2));
+      color:#fff;
+      border:none;
+      border-radius:11px;
+      padding:10px 14px;
+      font-size:13px;
+      cursor:pointer;
+      font-weight:600;
+      box-shadow:0 10px 26px rgba(0,184,255,0.45);
+    }
+    .btn:hover { transform:translateY(-1px); box-shadow:0 14px 30px rgba(0,184,255,0.6); }
+
+    input, textarea {
+      width:100%;
+      background:rgba(5,10,20,0.96);
+      color:var(--fg);
+      border:1px solid rgba(35,36,43,0.95);
+      border-radius:11px;
+      padding:9px 10px;
+      font-size:13px;
+      outline:none;
+      transition:border-color 0.2s, box-shadow 0.2s, background 0.2s;
+    }
+    textarea { min-height:120px; resize:vertical; }
+    input:focus, textarea:focus {
+      border-color:var(--accent);
+      box-shadow:0 0 0 1px rgba(0,184,255,0.5);
+      background:rgba(7,12,24,0.98);
+    }
+
+    .flex { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+
+    @media (max-width: 900px) {
+      .header-inner { flex-direction:column; align-items:flex-start; }
+      .span-8, .span-6, .span-4 { grid-column:span 12; }
+    }
   </style>
+
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   <script>mermaid.initialize({ startOnLoad: true, theme: 'dark' });</script>
 </head>
 <body>
-  <header>
-    <h1>QuickDCP - DCP Proof Chain</h1>
-    <div class="sub">RFC-3161 timestamping and manifest integrity flow for DCP mastering</div>
-  </header>
-  <main>
-    <section class="grid">
-      <div class="card span-8">
-        <h2>Overview</h2>
-        <p>The QuickDCP proof chain provides a verifiable link between a mastered DCP and its production manifest, using RFC-3161 Time-Stamp Authorities (TSAs). The server generates a TSQ from a canonical hash of the job manifest, and accepts a TSA-signed TSR which it verifies and persists. After TSA success, the manifest becomes publicly readable via the jobs endpoint.</p>
-        <div class="flex"><span class="tag">RFC-3161</span><span class="tag">SHA-256</span><span class="tag">OpenSSL</span><span class="tag">Deterministic JSON</span></div>
-      </div>
-      <div class="card span-4">
-        <h2>Endpoints</h2>
-        <ul class="muted">
-          <li><code class="inline">POST /proof/init</code></li>
-          <li><code class="inline">POST /proof/ack/tsa</code></li>
-          <li><code class="inline">GET /proof/status/{job_id}</code></li>
-          <li><code class="inline">GET /jobs/{job_id}</code> (unlocked after TSA OK)</li>
-        </ul>
-      </div>
-    </section>
+<div id="bg-stars"></div>
+<div id="bg-grid"></div>
+<div id="fog-layer"></div>
 
-    <section class="card span-12">
-      <h2>Sequence</h2>
-      <div class="mermaid">
+<header>
+  <div class="header-inner">
+    <div class="brand">
+      <h1>QuickDCP — DCP Proof Chain</h1>
+      <div class="sub">RFC‑3161 timestamping and manifest integrity for DCP mastering</div>
+    </div>
+    <nav class="nav">
+      <a href="/">System Core</a>
+      <a href="/verify.html">Verify</a>
+      <a href="/about.html">About</a>
+      <a href="#interactive">Interactive</a>
+      <a href="#security">Security</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="grid">
+    <div class="card span-8">
+      <h2>Overview</h2>
+      <p>
+        The QuickDCP proof chain links a mastered DCP to a canonical manifest using an RFC‑3161
+        Time‑Stamp Authority (TSA). The API derives a TSQ from the manifest SHA‑256, you obtain a
+        TSA‑signed TSR, and the node verifies and persists that response. Once the TSA status is OK,
+        the manifest becomes readable via <code class="inline">/jobs/&lt;job_id&gt;</code>.
+      </p>
+      <div class="flex">
+        <span class="tag">RFC‑3161</span>
+        <span class="tag">SHA‑256</span>
+        <span class="tag">OpenSSL</span>
+        <span class="tag">Deterministic JSON</span>
+      </div>
+    </div>
+    <div class="card span-4">
+      <h2>Core endpoints</h2>
+      <ul class="muted">
+        <li><code class="inline">POST /proof/init</code></li>
+        <li><code class="inline">POST /proof/ack/tsa</code></li>
+        <li><code class="inline">GET /proof/status/{job_id}</code></li>
+        <li><code class="inline">GET /jobs/{job_id}</code> (unlocked after TSA OK)</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="card span-12">
+    <h2>Sequence</h2>
+    <div class="mermaid">
       sequenceDiagram
         autonumber
         participant U as Client
@@ -88,174 +328,182 @@
         Q-->>U: status TSA_OK
         U->>Q: GET /jobs/{job_id}
         Q-->>U: manifest (unlocked)
-      </div>
-    </section>
+    </div>
+  </section>
 
-    <section class="grid">
-      <div class="card span-6">
-        <h2>Canonical JSON and hashing</h2>
-        <p>Canonicalization rules:</p>
-        <ul>
-          <li>NFC normalization on all strings</li>
-          <li>Objects have sorted keys, minimal separators</li>
-          <li>Array order preserved</li>
-        </ul>
-        <pre class="mono"># Python example
+  <section class="grid">
+    <div class="card span-6">
+      <h2>Canonical JSON & hashing</h2>
+      <p>Canonicalization rules:</p>
+      <ul>
+        <li>NFC normalization for all strings.</li>
+        <li>Objects serialized with sorted keys and minimal separators.</li>
+        <li>Array order preserved exactly.</li>
+      </ul>
+      <pre># Python example
 from api.utils.manifest import canonical_manifest_bytes, sha256_manifest
+
 sha = sha256_manifest(manifest)
 print(sha)</pre>
-      </div>
-      <div class="card span-6">
-        <h2>OpenSSL recipes</h2>
-        <pre class="mono"># Build TSQ from hex digest
-openssl ts -query -sha256 -digest &lt;HEX&gt; -cert -no_nonce -outform DER -out req.tsq
+    </div>
+    <div class="card span-6">
+      <h2>OpenSSL recipes</h2>
+      <pre># Build TSQ from hex digest
+openssl ts -query -sha256 -digest &lt;HEX&gt; -cert -no_nonce \
+  -outform DER -out req.tsq
 
 # Submit to TSA and receive TSR (provider specific)
 # Example using a mock TSA key
-openssl ts -reply -queryfile req.tsq -signer tsa.crt -inkey tsa.key -token_out -out resp.tsr
+openssl ts -reply -queryfile req.tsq -signer tsa.crt \
+  -inkey tsa.key -token_out -out resp.tsr
 
 # Verify TSR vs TSQ
 openssl ts -verify -in resp.tsr -queryfile req.tsq -CAfile tsa.crt</pre>
-      </div>
-    </section>
+    </div>
+  </section>
 
-    <section class="grid">
-      <div class="card span-8">
-        <h2>Interactive - compute manifest SHA and build ack payload</h2>
-        <div class="muted" style="margin-bottom:8px">Paste your manifest JSON and drop a TSR file. The tool computes the canonical SHA-256 and produces a ready-to-send JSON for <code class="inline">/proof/ack/tsa</code>. This runs locally in your browser.</div>
-        <div style="display:grid; gap:10px; grid-template-columns: 1fr 1fr; align-items:start">
-          <div>
-            <h3>Manifest JSON</h3>
-            <textarea id="manifest" placeholder='{"job_id":"JOB-123", "proof":{}}'></textarea>
-            <div class="flex" style="margin-top:8px">
-              <button class="btn" onclick="computeSHA()">Compute SHA-256</button>
-              <span id="shaOut" class="pill">sha256: -</span>
-            </div>
-          </div>
-          <div>
-            <h3>TSR file</h3>
-            <input id="tsrFile" type="file" accept=".tsr,application/octet-stream" />
-            <div class="flex" style="margin-top:8px">
-              <button class="btn" onclick="encodeTSR()">Encode Base64</button>
-              <span id="tsrSize" class="pill">size: -</span>
-            </div>
+  <section id="interactive" class="grid">
+    <div class="card span-8">
+      <h2>Interactive: compute manifest SHA + build ack payload</h2>
+      <p class="muted" style="margin-bottom:8px;">
+        Paste a manifest JSON and drop a TSR file. This page computes the canonical SHA‑256 and
+        prepares a ready‑to‑send JSON body for <code class="inline">/proof/ack/tsa</code>. Everything
+        runs locally in your browser.
+      </p>
+      <div style="display:grid; gap:10px; grid-template-columns: 1fr 1fr; align-items:flex-start;">
+        <div>
+          <h3>Manifest JSON</h3>
+          <textarea id="manifest" placeholder='{"job_id":"JOB-123","reels":[]}'></textarea>
+          <div class="flex" style="margin-top:8px;">
+            <button class="btn" onclick="computeSHA()">Compute SHA‑256</button>
+            <span id="shaOut" class="pill">sha256: -</span>
           </div>
         </div>
-        <h3>Ack JSON</h3>
-        <pre id="ackOut" class="mono">{
+        <div>
+          <h3>TSR file</h3>
+          <input id="tsrFile" type="file" accept=".tsr,application/octet-stream" />
+          <div class="flex" style="margin-top:8px;">
+            <button class="btn" onclick="encodeTSR()">Encode Base64</button>
+            <span id="tsrSize" class="pill">size: -</span>
+          </div>
+        </div>
+      </div>
+      <h3 style="margin-top:14px;">Ack JSON</h3>
+      <pre id="ackOut">{
   "job_id": "JOB-123",
   "tsr_base64": ""
 }</pre>
-      </div>
-      <div class="card span-4">
-        <h2>cURL examples</h2>
-        <pre class="mono"># 1) init
+    </div>
+    <div class="card span-4">
+      <h2>cURL examples</h2>
+      <pre># 1) init
 curl -s -X POST $API/proof/init \
-  -H "X-QD-Customer: $CUST" -H "Authorization: QuickDCP $KEY" \
+  -H "X-QD-Customer: $CUST" \
+  -H "Authorization: QuickDCP $KEY" \
   -H "Content-Type: application/json" \
   -d '{"job_id":"JOB-123"}' | jq
 
 # 2) ack
 curl -s -X POST $API/proof/ack/tsa \
-  -H "X-QD-Customer: $CUST" -H "Authorization: QuickDCP $KEY" \
+  -H "X-QD-Customer: $CUST" \
+  -H "Authorization: QuickDCP $KEY" \
   -H "Content-Type: application/json" \
   -d @ack.json | jq
 
 # 3) status
 curl -s $API/proof/status/JOB-123 \
-  -H "X-QD-Customer: $CUST" -H "Authorization: QuickDCP $KEY" | jq
-</pre>
-      </div>
-    </section>
+  -H "X-QD-Customer: $CUST" \
+  -H "Authorization: QuickDCP $KEY" | jq</pre>
+    </div>
+  </section>
 
-    <section class="grid">
-      <div class="card span-6">
-        <h2>Security model</h2>
-        <ul>
-          <li>Only authenticated clients can call proof endpoints</li>
-          <li>Proof record persists the manifest hash and TSA status</li>
-          <li>Manifest remains locked until tsa_ok is true</li>
-          <li>Object Lock and KMS recommended for buckets</li>
-        </ul>
-      </div>
-      <div class="card span-6">
-        <h2>Troubleshooting</h2>
-        <details open>
-          <summary>openssl ts -verify failed</summary>
-          <ul>
-            <li>Check that TSQ was generated from the same digest shown in /proof/init</li>
-            <li>Confirm TSA certificate chain and use -CAfile if needed</li>
-            <li>Ensure nonce is disabled in both TSQ and TSA</li>
-          </ul>
-        </details>
-        <details>
-          <summary>jobs endpoint still returns status only</summary>
-          <ul>
-            <li>Confirm /proof/ack/tsa returned status TSA_OK</li>
-            <li>Verify proof store contains tsa_ok true for the job id</li>
-          </ul>
-        </details>
-      </div>
-    </section>
-
-    <section class="card span-12">
-      <h2>Legal and compliance notes</h2>
+  <section id="security" class="grid">
+    <div class="card span-6">
+      <h2>Security model</h2>
       <ul>
-        <li>RFC-3161 timestamps do not replace copyright ownership but provide evidence of existence at time T.</li>
-        <li>Use EU qualified TSAs for eIDAS alignment when required by institutions.</li>
-        <li>Store proof artifacts in write-once buckets with retention policies.</li>
+        <li>Only authenticated clients can call proof endpoints.</li>
+        <li>Proof records persist manifest hash and TSA status per job.</li>
+        <li>Manifests stay locked until <code>tsa_ok</code> is true.</li>
+        <li>Use Object Lock + KMS on all buckets storing manifests and proofs.</li>
       </ul>
-    </section>
-  </main>
+    </div>
+    <div class="card span-6">
+      <h2>Troubleshooting</h2>
+      <details open>
+        <summary>openssl ts -verify failed</summary>
+        <ul>
+          <li>Check that TSQ was built from the same digest returned by <code>/proof/init</code>.</li>
+          <li>Confirm TSA certificate chain and pass <code>-CAfile</code> if required.</li>
+          <li>Ensure nonce is disabled on both TSQ and TSA.</li>
+        </ul>
+      </details>
+      <details>
+        <summary>jobs endpoint still returns status only</summary>
+        <ul>
+          <li>Confirm <code>/proof/ack/tsa</code> returned <code>TSA_OK</code>.</li>
+          <li>Verify proof store contains <code>tsa_ok = true</code> for the job id.</li>
+        </ul>
+      </details>
+    </div>
+  </section>
 
-  <script>
-    function nfcNormalize(input) {
-      if (typeof input === 'string') return input.normalize('NFC');
-      if (Array.isArray(input)) return input.map(nfcNormalize);
-      if (input && typeof input === 'object') {
-        const out = {};
-        Object.keys(input).sort().forEach(k => { out[k] = nfcNormalize(input[k]); });
-        return out;
-      }
-      return input;
-    }
+  <section class="card span-12">
+    <h2>Legal & compliance notes</h2>
+    <ul>
+      <li>RFC‑3161 timestamps provide evidence of existence at time T; they do not replace copyright ownership.</li>
+      <li>Use EU qualified TSAs for eIDAS alignment when required by institutions.</li>
+      <li>Store proof artifacts in write‑once buckets with retention policies matching your customers' contracts.</li>
+    </ul>
+  </section>
+</main>
 
-    async function computeSHA() {
-      const el = document.getElementById('manifest');
-      let obj;
-      try { obj = JSON.parse(el.value || '{}'); }
-      catch (e) { alert('Invalid JSON'); return; }
-      const canon = JSON.stringify(nfcNormalize(obj));
-      const enc = new TextEncoder().encode(canon);
-      const buf = await crypto.subtle.digest('SHA-256', enc);
-      const hex = [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
-      document.getElementById('shaOut').textContent = 'sha256: ' + hex;
-      patchAck('sha', hex);
+<script>
+  function nfcNormalize(input) {
+    if (typeof input === 'string') return input.normalize('NFC');
+    if (Array.isArray(input)) return input.map(nfcNormalize);
+    if (input && typeof input === 'object') {
+      const out = {};
+      Object.keys(input).sort().forEach(k => { out[k] = nfcNormalize(input[k]); });
+      return out;
     }
+    return input;
+  }
 
-    function patchAck(kind, value) {
-      const pre = document.getElementById('ackOut');
-      let ack;
-      try { ack = JSON.parse(pre.textContent); } catch { ack = { job_id: 'JOB-123', tsr_base64: '' }; }
-      if (kind === 'sha') {
-        // purely informational; ack carries only job_id and tsr_base64
-      } else if (kind === 'tsr') {
-        ack.tsr_base64 = value;
-      }
-      pre.textContent = JSON.stringify(ack, null, 2);
-    }
+  async function computeSHA() {
+    const el = document.getElementById('manifest');
+    let obj;
+    try { obj = JSON.parse(el.value || '{}'); }
+    catch (e) { alert('Invalid JSON'); return; }
+    const canon = JSON.stringify(nfcNormalize(obj));
+    const enc = new TextEncoder().encode(canon);
+    const buf = await crypto.subtle.digest('SHA-256', enc);
+    const hex = [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+    document.getElementById('shaOut').textContent = 'sha256: ' + hex;
+    patchAck('sha', hex);
+  }
 
-    function encodeTSR() {
-      const f = document.getElementById('tsrFile').files[0];
-      if (!f) { alert('Choose a TSR file first'); return; }
-      const r = new FileReader();
-      r.onload = () => {
-        const b64 = btoa(Array.from(new Uint8Array(r.result)).map(b => String.fromCharCode(b)).join(''));
-        document.getElementById('tsrSize').textContent = 'size: ' + f.size + ' bytes';
-        patchAck('tsr', b64);
-      };
-      r.readAsArrayBuffer(f);
+  function patchAck(kind, value) {
+    const pre = document.getElementById('ackOut');
+    let ack;
+    try { ack = JSON.parse(pre.textContent); }
+    catch { ack = { job_id: 'JOB-123', tsr_base64: '' }; }
+    if (kind === 'tsr') {
+      ack.tsr_base64 = value;
     }
-  </script>
+    pre.textContent = JSON.stringify(ack, null, 2);
+  }
+
+  function encodeTSR() {
+    const f = document.getElementById('tsrFile').files[0];
+    if (!f) { alert('Choose a TSR file first'); return; }
+    const r = new FileReader();
+    r.onload = () => {
+      const b64 = btoa(Array.from(new Uint8Array(r.result)).map(b => String.fromCharCode(b)).join(''));
+      document.getElementById('tsrSize').textContent = 'size: ' + f.size + ' bytes';
+      patchAck('tsr', b64);
+    };
+    r.readAsArrayBuffer(f);
+  }
+</script>
 </body>
 </html>

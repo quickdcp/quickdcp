@@ -78,13 +78,14 @@ async def healthz() -> dict[str, str]:
     except Exception:
         db_status = "error"
 
-    return {"ok": True, "db": db_status}
+    return {"ok": "true" if db_status == "ok" else "false", "db": db_status}
 
 
 # Router registration
 app.include_router(upload_stream.router)
 app.include_router(proof.router)
 app.include_router(internal.router)
+app.include_router(internal.router, prefix="/jobs")
 app.include_router(verify.router)
 app.include_router(billing.router)
 app.include_router(kdm.router)

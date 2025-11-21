@@ -55,15 +55,7 @@ services:
     depends_on:
       - minio
     entrypoint: ["/bin/sh", "-c"]
-    command: |
-      until (/usr/bin/mc alias set local http://minio:9000 minio minio123); do
-        echo 'waiting for minio...'
-        sleep 2
-      done
-      /usr/bin/mc mb -p local/quickdcp-ingest || true
-      /usr/bin/mc mb -p local/quickdcp-out || true
-      /usr/bin/mc mb -p local/quickdcp-vault || true
-      /usr/bin/mc mb -p local/quickdcp-logs || true
+    command: "/usr/bin/mc alias set local http://minio:9000 minio minio123 && /usr/bin/mc mb -p local/quickdcp-ingest || true && /usr/bin/mc mb -p local/quickdcp-out || true && /usr/bin/mc mb -p local/quickdcp-vault || true && /usr/bin/mc mb -p local/quickdcp-logs || true"
 
   supabase:
     image: supabase/postgres:15.1.0.112

@@ -15,14 +15,14 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl jq zip unzip xz-utils locales tzdata \
     python3 python3-pip \
-    ffmpeg openjpeg-tools xmlstarlet genext2fs e2fsprogs openssl \
+    ffmpeg xmlstarlet genext2fs e2fsprogs openssl \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 # Python dependencies
 COPY infra/requirements.txt /app/
-RUN pip3 install --no-cache-dir -r /app/requirements.txt
+RUN PIP_BREAK_SYSTEM_PACKAGES=1 pip3 install --no-cache-dir -r /app/requirements.txt
 
 # App code
 COPY api/ /app/api/

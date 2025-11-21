@@ -1,46 +1,64 @@
--- Enable extensions
-create extension if not exists "pgcrypto";
-create extension if not exists "uuid-ossp";
+-- QuickDCP Supabase/Postgres bootstrap schema
 
--- Customers (maps to X-QD-Customer header)
+-- Ensure supabase_admin exists for local dev (compat with Supabase image)
+do $$
+begin
+  if not exists (select 1 from pg_roles where rolname = 'supabase_admin') then
+    create role supabase_admin login superuser;
+  end if;
+end $$;
+
+-- Optionally run the rest of the script as supabase_admin
+set role supabase_admin;
+
+-- Enable useful extensions
+create extension if not exists "uuid-ossp";
+create extension if not exists "pgcrypto";
+
+-- Namespace for helper functions
+create schema if not exists qd;
+
+-- Customers table (one row per customer/operator)
 create table if not exists public.customers (
   id uuid primary key default gen_random_uuid(),
-  code text unique not null,
+  code text not null unique,
+  name text,
   created_at timestamptz default now()
 );
 
--- Jobs table
+-- Jobs table: one logical render job
 create table if not exists public.jobs (
   id uuid primary key default gen_random_uuid(),
-  job_id text unique not null,
-  customer_id uuid references public.customers(id) on delete cascade,
+  customer_id uuid not null references public.customers(id) on delete cascade,
+  job_id text not null unique,
   status text not null default 'QUEUED',
-  profile jsonb not null default '{}',
-  manifest jsonb not null default '{}',
+  profile jsonb not null default '{}'::jsonb,
+  manifest jsonb not null default '{}'::jsonb,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
 
 create index if not exists jobs_customer_idx on public.jobs(customer_id);
-create index if not exists jobs_jobid_idx on public.jobs(job_id);
+create index if not exists jobs_status_idx on public.jobs(status);
 
--- Proofs table
+-- Proofs table: authoritative proof record for each job
 create table if not exists public.proofs (
   id uuid primary key default gen_random_uuid(),
-  job_id uuid references public.jobs(id) on delete cascade,
+  job_id uuid not null references public.jobs(id) on delete cascade,
+  status text not null default 'PENDING',
   manifest_sha256 text not null,
-  tsa_ok boolean default false,
+  tsa_ok boolean not null default false,
+  tsa_tsr_uri text,
   fp_proof_id text,
-  fp_verified boolean default false,
-  status text default 'PENDING',
+  fp_verified boolean,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
 
-create index if not exists proofs_job_idx on public.proofs(job_id);
-create index if not exists proofs_sha_idx on public.proofs(manifest_sha256);
+create unique index if not exists proofs_job_unique on public.proofs(job_id);
+create index if not exists proofs_status_idx on public.proofs(status);
 
--- KDMs
+-- KDMs (stub for future expansion)
 create table if not exists public.kdms (
   id uuid primary key default gen_random_uuid(),
   job_id uuid references public.jobs(id) on delete cascade,
@@ -51,39 +69,38 @@ create table if not exists public.kdms (
   tsa_tsr_uri text,
   created_at timestamptz default now()
 );
-
 create index if not exists kdms_job_idx on public.kdms(job_id);
 
--- Row Level Security
+-- Basic RLS (per customer)
 alter table public.jobs enable row level security;
 alter table public.proofs enable row level security;
 alter table public.kdms enable row level security;
 
--- Helper: map active customer code → ID
-create or replace function qd_customer_id()
-returns uuid
-language sql
-stable
-as $$
-  select id from public.customers
+-- Session helper: resolve current customer from setting
+create or replace function qd.qd_customer_id() returns uuid
+language sql stable as $$
+  select id
+  from public.customers
   where code = current_setting('qd.customer_code', true)::text
-  limit 1;
+  limit 1
 $$;
 
--- RLS Policies
+-- Jobs RLS: only see your own jobs
 create policy jobs_rls on public.jobs
-  using (customer_id = qd_customer_id())
-  with check (customer_id = qd_customer_id());
+  using (customer_id = qd.qd_customer_id())
+  with check (customer_id = qd.qd_customer_id());
 
+-- Proofs RLS: only proofs for your jobs
 create policy proofs_rls on public.proofs
-  using (job_id in (select id from public.jobs where customer_id = qd_customer_id()))
-  with check (job_id in (select id from public.jobs where customer_id = qd_customer_id()));
+  using (job_id in (select id from public.jobs where customer_id = qd.qd_customer_id()))
+  with check (job_id in (select id from public.jobs where customer_id = qd.qd_customer_id()));
 
+-- KDMs RLS: only KDMs for your jobs
 create policy kdms_rls on public.kdms
-  using (job_id in (select id from public.jobs where customer_id = qd_customer_id()))
-  with check (job_id in (select id from public.jobs where customer_id = qd_customer_id()));
+  using (job_id in (select id from public.jobs where customer_id = qd.qd_customer_id()))
+  with check (job_id in (select id from public.jobs where customer_id = qd.qd_customer_id()));
 
--- Seed demo customer
+-- Seed demo customer for local dev
 insert into public.customers(code)
 values ('demo')
-on conflict do nothing;
+on conflict (code) do nothing;

@@ -1,10 +1,20 @@
-.env
-*.tsr
-*.tsq
-vault/*.json
-__pycache__/
-*.pyc
-node_modules/
+# macOS
 .DS_Store
 
+# Python / venv
+__pycache__/
+*.pyc
 .venv/
+venv/
+
+# Local data / buckets / db
+.data/
+jobs/
+vault/*.tsr
+vault/*.tsq
+
+# Node
+node_modules/
+
+# Env
+.env

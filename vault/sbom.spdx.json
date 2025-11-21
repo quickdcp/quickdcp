@@ -1,0 +1,101 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "QuickDCP SBOM",
+  "documentNamespace": "https://quickdcp.com/sbom/2025-10-17",
+  "creationInfo": {
+    "created": "2025-10-17T00:00:00Z",
+    "creators": [
+      "Tool: quickdcp-sbomgen-1.0",
+      "Organization: Kaaffilm Empire",
+      "Person: Kaaffilm DevOps"
+    ],
+    "licenseListVersion": "3.22"
+  },
+  "packages": [
+    {
+      "name": "quickdcp-api",
+      "SPDXID": "SPDXRef-quickdcp-api",
+      "versionInfo": "1.0.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "Copyright (c) 2025 Kaaffilm Empire",
+      "supplier": "Organization: Kaaffilm Empire",
+      "summary": "FastAPI backend providing DCP automation, proof, and KDM services."
+    },
+    {
+      "name": "quickdcp-node-sdk",
+      "SPDXID": "SPDXRef-quickdcp-node-sdk",
+      "versionInfo": "0.1.0",
+      "downloadLocation": "https://npmjs.com/package/quickdcp",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "Copyright (c) 2025 Kaaffilm Empire",
+      "supplier": "Organization: Kaaffilm Empire",
+      "summary": "Node.js SDK for QuickDCP API (multipart upload + proof)."
+    },
+    {
+      "name": "quickdcp-python-sdk",
+      "SPDXID": "SPDXRef-quickdcp-python-sdk",
+      "versionInfo": "0.1.0",
+      "downloadLocation": "https://pypi.org/project/quickdcp",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "Copyright (c) 2025 Kaaffilm Empire",
+      "supplier": "Organization: Kaaffilm Empire",
+      "summary": "Python SDK for QuickDCP API (requests-based)."
+    },
+    {
+      "name": "fastapi",
+      "SPDXID": "SPDXRef-fastapi",
+      "versionInfo": "0.115.0",
+      "downloadLocation": "https://pypi.org/project/fastapi/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "supplier": "Organization: FastAPI Team",
+      "summary": "Python web framework for building APIs."
+    },
+    {
+      "name": "requests",
+      "SPDXID": "SPDXRef-requests",
+      "versionInfo": "2.32.3",
+      "downloadLocation": "https://pypi.org/project/requests/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "supplier": "Organization: PSF",
+      "summary": "Python HTTP client library."
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-quickdcp-api"
+    },
+    {
+      "spdxElementId": "SPDXRef-quickdcp-api",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-fastapi"
+    },
+    {
+      "spdxElementId": "SPDXRef-quickdcp-python-sdk",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-requests"
+    }
+  ],
+  "annotations": [
+    {
+      "annotationDate": "2025-10-17T00:00:00Z",
+      "annotationType": "OTHER",
+      "annotator": "Tool: quickdcp-sbomgen",
+      "comment": "Generated automatically during CI build."
+    }
+  ]
+}

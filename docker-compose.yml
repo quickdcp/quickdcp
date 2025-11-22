@@ -1,68 +1,73 @@
-version: "3.9"
-
 services:
-  api:
+  quickdcp-api:
     build:
       context: .
-      dockerfile: infra/Dockerfile
+      target: quickdcp-api
     container_name: quickdcp-api
     environment:
-      PORT: 8080
-      AWS_ACCESS_KEY_ID: minio
-      AWS_SECRET_ACCESS_KEY: minio123
-      AWS_DEFAULT_REGION: us-east-1
-      S3_BUCKET_INGEST: quickdcp-ingest
+      # Postgres DSN – used by DB layer
+      DB_URL: postgresql://postgres:postgres@quickdcp-supabase:5432/postgres?sslmode=disable
+      SUPABASE_DB_URL: postgresql://postgres:postgres@quickdcp-supabase:5432/postgres?sslmode=disable
+      DATABASE_URL: postgresql://postgres:postgres@quickdcp-supabase:5432/postgres?sslmode=disable
+
+      # Worker auth shared secret
+      WORKER_TOKEN: dev
+
+      # S3 / MinIO
+      S3_ENDPOINT: http://quickdcp-minio:9000
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET_IN: quickdcp
       S3_BUCKET_OUT: quickdcp-out
       S3_BUCKET_VAULT: quickdcp-vault
       S3_BUCKET_LOGS: quickdcp-logs
-      DATABASE_URL: postgresql://postgres:postgres@supabase:5432/postgres
-      WORKER_TOKEN: dev-worker-token
-      QD_COST_GUARD_EUR: 150
     ports:
       - "8080:8080"
     depends_on:
-      - minio
-      - supabase
+      - quickdcp-supabase
+      - quickdcp-minio
 
-  worker:
+  quickdcp-worker:
     build:
       context: .
-      dockerfile: infra/Dockerfile
+      target: quickdcp-worker
     container_name: quickdcp-worker
-    command: ["python3", "worker/worker.py"]
     environment:
-      API_BASE: http://api:8080
-      WORKER_TOKEN: dev-worker-token
+      API_BASE: http://quickdcp-api:8080
+      WORKER_TOKEN: dev
     depends_on:
-      - api
+      - quickdcp-api
 
-  minio:
-    image: minio/minio:RELEASE.2024-10-02T17-50-41Z
+  quickdcp-minio:
+    image: minio/minio:latest
     container_name: quickdcp-minio
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: minio
-      MINIO_ROOT_PASSWORD: minio123
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
     ports:
       - "9000:9000"
       - "9001:9001"
     volumes:
       - ./.data/minio:/data
 
-  mc-init:
+  quickdcp-mc-init:
     image: minio/mc:latest
     container_name: quickdcp-mc-init
     depends_on:
-      - minio
-    entrypoint: ["/bin/sh", "-c"]
-    command: >
-      /usr/bin/mc alias set local http://minio:9000 minio minio123 &&
-      /usr/bin/mc mb -p local/quickdcp-ingest || true &&
+      - quickdcp-minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5 &&
+      /usr/bin/mc alias set local http://quickdcp-minio:9000 minioadmin minioadmin &&
+      /usr/bin/mc mb -p local/quickdcp || true &&
       /usr/bin/mc mb -p local/quickdcp-out || true &&
       /usr/bin/mc mb -p local/quickdcp-vault || true &&
       /usr/bin/mc mb -p local/quickdcp-logs || true
+      "
 
-  supabase:
+  quickdcp-supabase:
     image: supabase/postgres:15.1.0.112
     container_name: quickdcp-supabase
     environment:
@@ -74,3 +79,7 @@ services:
     volumes:
       - ./.data/supabase:/var/lib/postgresql/data
       - ./supabase/migrations:/docker-entrypoint-initdb.d
+
+networks:
+  default:
+    name: quickdcp_default

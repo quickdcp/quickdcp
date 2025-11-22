@@ -1,30 +1,180 @@
-name: quickdcp-deploy
-on:
-  push:
-    branches: [ main ]
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "QuickDCP API",
+    "version": "2025.1.0",
+    "description": "Full hardened QuickDCP API specification."
+  },
+  "servers": [
+    { "url": "http://localhost:8080", "description": "Local Dev" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key"
+      },
+      "WorkerAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-worker-token"
+      }
+    },
+    "schemas": {
+      "Job": {
+        "type": "object",
+        "properties": {
+          "job_id": { "type": "string" },
+          "customer_id": { "type": "string" },
+          "status": { "type": "string" },
+          "profile": { "type": "string" },
+          "manifest": { "type": "object" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "NextJobResponse": {
+        "oneOf": [
+          {
+            "description": "Empty queue",
+            "type": "object",
+            "properties": { "status": { "type": "string", "enum": ["EMPTY"] } }
+          },
+          {
+            "description": "Single Job",
+            "$ref": "#/components/schemas/Job"
+          },
+          {
+            "description": "Unexpected type",
+            "type": "array",
+            "items": {}
+          }
+        ]
+      }
+    }
+  },
+  "security": [
+    { "ApiKeyAuth": [] }
+  ],
+  "paths": {
+    "/healthz": {
+      "get": {
+        "summary": "Health Check",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": { "application/json": {} }
+          }
+        }
+      }
+    },
 
-jobs:
-  build-deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    "/upload/ingest": {
+      "post": {
+        "summary": "Upload and ingest a video/image/DCP",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": { "type": "string", "format": "binary" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": { "description": "Ingest accepted" }
+        }
+      }
+    },
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+    "/jobs/internal/next-job": {
+      "post": {
+        "summary": "Worker requests next job",
+        "security": [{ "WorkerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Next job or empty",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/NextJobResponse" }
+              }
+            }
+          },
+          "401": { "description": "Invalid worker token" }
+        }
+      }
+    },
 
-      - name: SBOM
-        run: |
-          pip install syft
-          syft . -o spdx-json > vault/sbom.spdx.json
+    "/jobs/{job_id}/update": {
+      "post": {
+        "summary": "Worker updates job status",
+        "security": [{ "WorkerAuth": [] }],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "schema": { "type": "string" },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": { "type": "string" },
+                  "manifest": { "type": "object" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Updated" },
+          "400": { "description": "Invalid" }
+        }
+      }
+    },
 
-      - name: Build
-        run: docker build -t quickdcp:latest -f infra/Dockerfile .
+    "/verify/dcp": {
+      "post": {
+        "summary": "Verify DCP integrity",
+        "security": [{ "ApiKeyAuth": [] }],
+        "requestBody": { "required": true },
+        "responses": { "200": {} }
+      }
+    },
 
-      - name: Setup Flyctl
-        uses: superfly/flyctl-actions/setup-flyctl@master
+    "/kdm/generate": {
+      "post": {
+        "summary": "Generate a KDM batch",
+        "security": [{ "ApiKeyAuth": [] }],
+        "responses": { "200": {} }
+      }
+    },
 
-      - name: Fly Deploy
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-        run: flyctl deploy -c infra/fly.toml --remote-only
+    "/proof/chain": {
+      "get": {
+        "summary": "Proof-chain manifest for a job",
+        "security": [{ "ApiKeyAuth": [] }],
+        "responses": { "200": {} }
+      }
+    },
+
+    "/billing/usage": {
+      "get": {
+        "summary": "Get customer billing usage",
+        "security": [{ "ApiKeyAuth": [] }],
+        "responses": { "200": {} }
+      }
+    }
+  }
+}

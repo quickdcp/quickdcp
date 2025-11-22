@@ -1,0 +1,48 @@
+# ============================================================================
+# Base image with Python + deps
+# ============================================================================
+FROM python:3.13-slim AS base
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Python deps
+COPY infra/requirements.txt /app/infra/requirements.txt
+RUN pip install --upgrade pip setuptools wheel
+RUN PIP_BREAK_SYSTEM_PACKAGES=1 pip3 install -r /app/infra/requirements.txt
+
+# ============================================================================
+# API TARGET
+# ============================================================================
+FROM base AS quickdcp-api
+
+COPY api/ /app/api/
+COPY public/ /app/public/
+COPY worker/ /app/worker/
+
+RUN useradd -u 10001 qd && chown -R qd:qd /app
+USER qd
+
+EXPOSE 8080
+
+CMD ["python3", "-m", "api.main"]
+
+# ============================================================================
+# WORKER TARGET
+# ============================================================================
+FROM base AS quickdcp-worker
+
+COPY api/ /app/api/
+COPY worker/ /app/worker/
+
+RUN useradd -u 10001 qd && chown -R qd:qd /app
+USER qd
+
+CMD ["python3", "worker/worker.py"]

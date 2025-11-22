@@ -1,593 +1,2627 @@
-<!doctype html>
-<html lang="en" data-theme="dark">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>QuickDCP — System Core Console</title>
-
-<style>
-  :root {
-    --bg: #020307;
-    --fg: #e8e8ee;
-    --card: rgba(8,12,20,0.85);
-    --card-border: rgba(160,200,255,0.18);
-    --accent: #00b8ff;
-    --accent2: #00ffa2;
-    --gold: #d8b15a;
-    --error: #ff4d6a;
-    --shadow: 0 16px 46px rgba(0,0,0,0.8);
-    --blur: blur(22px);
-  }
-
-  * { box-sizing:border-box; }
-
-  body {
-    margin:0;
-    background:var(--bg);
-    color:var(--fg);
-    font-family:system-ui,Arial,-apple-system,Segoe UI,sans-serif;
-    overflow-x:hidden;
-    animation:screen-on 1.1s ease;
-  }
-
-  @keyframes screen-on {
-    0% { filter:brightness(0) blur(8px); opacity:0; }
-    40% { filter:brightness(0.25) blur(2px); opacity:1; }
-    100% { filter:brightness(1) blur(0); }
-  }
-
-  /* BACKGROUND: OBSERVATORY STARFIELD + NEON GRID */
-  #bg-stars, #bg-grid {
-    position:fixed;
-    top:0; left:0;
-    width:100vw; height:100vh;
-    z-index:-6;
-  }
-  #bg-stars {
-    background:
-      radial-gradient(circle at 10% 20%, rgba(255,255,255,0.13), transparent 55%),
-      radial-gradient(circle at 80% 10%, rgba(0,255,255,0.14), transparent 55%),
-      radial-gradient(circle at 50% 90%, rgba(216,177,90,0.14), transparent 55%),
-      #020307;
-  }
-  #bg-grid::after {
-    content:"";
-    position:absolute;
-    inset:0;
-    background-image:
-      linear-gradient(rgba(0,255,255,0.08) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(0,255,255,0.08) 1px, transparent 1px);
-    background-size:40px 40px;
-    transform:perspective(260px) rotateX(62deg) translateY(140px);
-    opacity:0.2;
-    animation:grid-shift 24s linear infinite;
-  }
-  @keyframes grid-shift {
-    0% { transform:perspective(260px) rotateX(62deg) translateY(140px); }
-    100% { transform:perspective(260px) rotateX(62deg) translateY(-220px); }
-  }
-
-  /* VOLUMETRIC FOG */
-  #fog-layer {
-    position:fixed;
-    inset:0;
-    pointer-events:none;
-    background:radial-gradient(circle at 50% 35%, rgba(255,255,255,0.08), transparent 70%);
-    mix-blend-mode:screen;
-    animation:fogflow 26s ease-in-out infinite alternate;
-    z-index:-5;
-  }
-  @keyframes fogflow {
-    0% { transform:translate(-16px,-12px) scale(1.03); opacity:0.35; }
-    100% { transform:translate(26px,22px) scale(1.08); opacity:0.7; }
-  }
-
-  /* AUDIO‑REACTIVE RING */
-  #audio-ring {
-    position:fixed;
-    top:50%; left:50%;
-    width:260px; height:260px;
-    border-radius:50%;
-    transform:translate(-50%,-50%) scale(0.6);
-    box-shadow:
-      0 0 40px rgba(0,255,162,0.6),
-      inset 0 0 40px rgba(0,255,162,0.4);
-    opacity:0.15;
-    transition:0.08s linear;
-    pointer-events:none;
-    z-index:-3;
-  }
-
-  /* TOP NAV + HEADER */
-  header {
-    position:sticky;
-    top:0;
-    z-index:10;
-    backdrop-filter:var(--blur);
-    background:linear-gradient(180deg, rgba(4,8,20,0.92), rgba(4,8,20,0.8));
-    border-bottom:1px solid rgba(160,200,255,0.4);
-    box-shadow:var(--shadow);
-  }
-  .header-inner {
-    max-width:1600px;
-    margin:0 auto;
-    padding:18px 20px 16px;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:16px;
-  }
-  .brand {
-    display:flex;
-    flex-direction:column;
-    gap:2px;
-  }
-  h1 { margin:0; font-size:28px; letter-spacing:0.7px; color:var(--gold); }
-  .sub { font-size:13px; color:#b8bfd4; }
-
-  .nav {
-    display:flex;
-    gap:6px;
-    flex-wrap:wrap;
-    justify-content:flex-end;
-  }
-  .nav button {
-    padding:6px 10px;
-    font-size:12px;
-    border-radius:999px;
-    background:rgba(3,12,24,0.9);
-    border:1px solid rgba(160,200,255,0.4);
-    cursor:pointer;
-    color:#d6def8;
-    box-shadow:none;
-    letter-spacing:0.2px;
-  }
-  .nav button:hover { background:rgba(0,184,255,0.24); }
-
-  main {
-    padding:32px 20px 56px;
-    max-width:1600px;
-    margin:0 auto;
-  }
-
-  /* MAIN LAYOUT */
-  .layout {
-    display:grid;
-    grid-template-columns:minmax(0,2.1fr) minmax(0,1.2fr);
-    gap:32px;
-  }
-
-  .card {
-    background:var(--card);
-    backdrop-filter:var(--blur);
-    padding:24px;
-    border-radius:20px;
-    border:1px solid var(--card-border);
-    box-shadow:var(--shadow);
-    margin-bottom:24px;
-    position:relative;
-    overflow:hidden;
-    transition:transform 0.3s, border-color 0.3s, box-shadow 0.3s;
-  }
-  .card:hover { transform:translateY(-3px); border-color:var(--accent2); box-shadow:0 18px 46px rgba(0,0,0,0.9); }
-
-  .card::before {
-    content:"";
-    position:absolute;
-    inset:-1px;
-    border-radius:inherit;
-    background:conic-gradient(
-      from 220deg,
-      rgba(0,184,255,0.26),
-      rgba(0,255,162,0.26),
-      rgba(216,177,90,0.26),
-      rgba(0,184,255,0.26)
-    );
-    mix-blend-mode:screen;
-    opacity:0.12;
-    filter:blur(18px);
-    z-index:-1;
-  }
-
-  h2 { margin:0 0 14px; font-size:18px; color:var(--gold); letter-spacing:0.4px; }
-
-  label { font-size:13px; margin-bottom:6px; display:block; color:#c5cce3; }
-
-  input,select,textarea,button {
-    font-size:14px;
-    padding:10px 12px;
-    border-radius:10px;
-    border:1px solid rgba(160,200,255,0.3);
-    background:rgba(3,6,12,0.92);
-    color:var(--fg);
-    outline:none;
-    transition:border-color 0.25s, box-shadow 0.25s, background 0.25s;
-  }
-  input:focus,select:focus,textarea:focus {
-    border-color:var(--accent);
-    box-shadow:0 0 0 1px rgba(0,184,255,0.5);
-    background:rgba(6,12,20,0.96);
-  }
-  button {
-    cursor:pointer;
-    background:linear-gradient(120deg, var(--accent), var(--accent2));
-    border:none;
-    color:#fff;
-    font-weight:600;
-    letter-spacing:0.3px;
-    box-shadow:0 10px 26px rgba(0,184,255,0.45);
-  }
-  button:hover { transform:translateY(-1px); box-shadow:0 16px 30px rgba(0,184,255,0.6); }
-
-  .row { display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap; }
-  pre {
-    background:rgba(1,4,10,0.95);
-    border-radius:12px;
-    padding:12px;
-    font-size:12px;
-    border:1px solid rgba(160,200,255,0.22);
-    white-space:pre-wrap;
-    max-height:220px;
-    overflow:auto;
-  }
-
-  .progress-bar { width:100%; height:12px; border-radius:20px; overflow:hidden; background:rgba(5,12,16,0.9); box-shadow:inset 0 0 10px rgba(0,0,0,0.7); }
-  .progress-bar > div { height:100%; width:0%; background:linear-gradient(90deg,var(--accent),var(--accent2)); transition:width 0.2s; }
-
-  .badge { padding:5px 9px; border-radius:999px; font-size:11px; border:1px solid rgba(160,200,255,0.5); background:rgba(4,8,16,0.9); white-space:nowrap; }
-  .badge.ok { color:#6effb1; border-color:#6effb1; }
-  .badge.fail { color:var(--error); border-color:var(--error); }
-
-  /* NEON NODE MAP */
-  #node-map { display:flex; flex-wrap:wrap; gap:8px; }
-  .node {
-    padding:7px 10px;
-    border-radius:999px;
-    background:radial-gradient(circle at 10% 0%, rgba(0,255,162,0.26), rgba(5,10,18,1));
-    border:1px solid rgba(0,184,255,0.6);
-    font-size:11px;
-    position:relative;
-  }
-  .node::after {
-    content:"";
-    position:absolute;
-    inset:-1px;
-    border-radius:inherit;
-    border:1px solid rgba(0,184,255,0.4);
-    opacity:0.4;
-  }
-
-  /* FORENSIC PANEL */
-  #forensic { font-size:12px; line-height:1.5; }
-  #forensic .label { color:#8fa2ff; }
-
-  /* COMMAND PALETTE (⌘K / Ctrl+K) */
-  #cmdk {
-    position:fixed;
-    inset:0;
-    display:none;
-    align-items:flex-start;
-    justify-content:center;
-    padding-top:120px;
-    background:rgba(0,0,0,0.7);
-    backdrop-filter:blur(12px);
-    z-index:40;
-  }
-  #cmdk-panel {
-    width:min(600px, 100% - 32px);
-    background:#05070e;
-    border-radius:18px;
-    border:1px solid rgba(160,200,255,0.5);
-    box-shadow:var(--shadow);
-    padding:16px 16px 10px;
-  }
-  #cmdk-input { width:100%; margin-bottom:10px; }
-  #cmdk-list { max-height:260px; overflow:auto; font-size:14px; }
-  #cmdk-list div { padding:8px 6px; border-radius:8px; cursor:pointer; }
-  #cmdk-list div:hover { background:rgba(0,184,255,0.16); }
-
-  /* RESPONSIVE BREAKPOINTS */
-  @media (max-width: 1200px) {
-    .layout {
-      grid-template-columns:1fr;
+  <meta charset="UTF-8" />
+  <title>QuickDCP — System Core</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="QuickDCP-logo100.png" />
+  <style>
+    :root {
+      --bg: #030712;
+      --bg-elevated: #050816;
+      --bg-elevated-soft: #070b1c;
+      --border-subtle: rgba(148, 163, 184, 0.08);
+      --border-strong: rgba(56, 189, 248, 0.8);
+      --text-main: #e5e7eb;
+      --text-soft: #9ca3af;
+      --text-muted: #6b7280;
+      --accent-cyan: #22d3ee;
+      --accent-green: #4ade80;
+      --accent-amber: #fbbf24;
+      --accent-red: #f97373;
+      --chip-bg: rgba(15, 23, 42, 0.9);
+      --chip-border: rgba(148, 163, 184, 0.4);
+      --shadow-soft: 0 22px 60px rgba(15, 23, 42, 0.9);
+      --radius-xl: 26px;
+      --radius-lg: 18px;
+      --radius-pill: 999px;
+      --transition-fast: 140ms ease-out;
+      --transition-slow: 260ms ease-out;
     }
-  }
-  @media (max-width: 900px) {
-    .header-inner { flex-direction:column; align-items:flex-start; }
-    .nav { justify-content:flex-start; }
-    main { padding:24px 16px 40px; }
-  }
-  @media (max-width: 640px) {
-    h1 { font-size:22px; }
-    .sub { font-size:12px; }
-    .card { padding:18px; }
-    pre { max-height:160px; }
-  }
-</style>
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+        "SF Pro Display", -apple-system, BlinkMacSystemFont, Inter, Roboto,
+        Helvetica, Arial, sans-serif;
+      background: radial-gradient(circle at top, #020617 0, #000 60%);
+      color: var(--text-main);
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(
+          circle at 10% -10%,
+          rgba(56, 189, 248, 0.25),
+          transparent 55%
+        ),
+        radial-gradient(
+          circle at 90% 0%,
+          rgba(59, 130, 246, 0.24),
+          transparent 55%
+        );
+      opacity: 0.8;
+      mix-blend-mode: screen;
+      pointer-events: none;
+      z-index: -3;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(
+          circle at 20% 120%,
+          rgba(16, 185, 129, 0.2),
+          transparent 55%
+        ),
+        radial-gradient(
+          circle at 80% 120%,
+          rgba(129, 140, 248, 0.25),
+          transparent 55%
+        );
+      opacity: 0.6;
+      mix-blend-mode: screen;
+      pointer-events: none;
+      z-index: -3;
+    }
+
+    .bg-texture {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.18;
+      background-image: linear-gradient(
+          90deg,
+          rgba(148, 163, 184, 0.12) 1px,
+          transparent 1px
+        ),
+        linear-gradient(
+          180deg,
+          rgba(148, 163, 184, 0.12) 1px,
+          transparent 1px
+        );
+      background-size: 80px 80px;
+      mask-image: radial-gradient(circle at 15% 20%, #000 0, transparent 60%);
+      z-index: -2;
+    }
+
+    .app-shell {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      backdrop-filter: blur(20px);
+      background: linear-gradient(
+          to bottom,
+          rgba(15, 23, 42, 0.92),
+          rgba(15, 23, 42, 0.9),
+          rgba(15, 23, 42, 0.7),
+          transparent
+        ),
+        radial-gradient(circle at top left, rgba(59, 130, 246, 0.2), transparent 55%);
+      border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .header-inner {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 18px 32px 14px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    @media (max-width: 960px) {
+      .header-inner {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 14px 18px 10px;
+        gap: 12px;
+      }
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .brand-logo {
+      width: 46px;
+      height: 46px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 0, #ffffff, #e5e7eb 24%, #000 100%);
+      box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.9),
+        0 0 0 4px rgba(30, 64, 175, 0.8),
+        0 0 40px rgba(56, 189, 248, 0.9);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .brand-logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: inherit;
+    }
+
+    .brand-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .brand-title {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .brand-subtitle {
+      font-size: 12px;
+      color: var(--text-soft);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .header-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    @media (max-width: 960px) {
+      .header-right {
+        width: 100%;
+        margin-left: 0;
+        justify-content: space-between;
+      }
+    }
+
+    .env-pill {
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      background: radial-gradient(
+          circle at top left,
+          rgba(52, 211, 153, 0.25),
+          transparent 55%
+        ),
+        rgba(15, 23, 42, 0.9);
+      color: var(--text-soft);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.8);
+    }
+
+    .dot-small {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: #22c55e;
+      box-shadow: 0 0 10px rgba(34, 197, 94, 0.9);
+    }
+
+    .api-status {
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(248, 113, 113, 0.9);
+      background: rgba(127, 29, 29, 0.9);
+      color: #fecaca;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 0 18px rgba(248, 113, 113, 0.8);
+    }
+
+    .api-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: #f97373;
+      box-shadow: 0 0 16px rgba(248, 113, 113, 0.95);
+    }
+
+    .api-status.ok {
+      border-color: rgba(52, 211, 153, 0.9);
+      background: rgba(5, 46, 22, 0.9);
+      color: #bbf7d0;
+      box-shadow: 0 0 18px rgba(16, 185, 129, 0.9);
+    }
+
+    .api-status.ok .api-dot {
+      background: #4ade80;
+      box-shadow: 0 0 16px rgba(74, 222, 128, 1);
+    }
+
+    .nav-pills {
+      display: flex;
+      gap: 8px;
+      padding: 0 32px 14px;
+      max-width: 1320px;
+      margin: -4px auto 0;
+      flex-wrap: wrap;
+    }
+
+    @media (max-width: 960px) {
+      .nav-pills {
+        padding: 0 18px 14px;
+      }
+    }
+
+    .nav-pill {
+      font-size: 12px;
+      border-radius: 999px;
+      padding: 6px 14px;
+      border: 1px solid rgba(148, 163, 184, 0.45);
+      background: rgba(15, 23, 42, 0.95);
+      color: var(--text-soft);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background var(--transition-fast),
+        border-color var(--transition-fast), color var(--transition-fast),
+        box-shadow var(--transition-fast), transform 120ms ease-out;
+    }
+
+    .nav-pill span {
+      font-size: 10px;
+      opacity: 0.8;
+    }
+
+    .nav-pill:hover {
+      border-color: rgba(56, 189, 248, 0.9) !important;
+      color: var(--text-main);
+      box-shadow: 0 0 22px rgba(56, 189, 248, 0.45);
+      transform: translateY(-1px);
+    }
+
+    .nav-pill.active {
+      background: radial-gradient(
+          circle at top,
+          rgba(34, 211, 238, 0.45),
+          rgba(8, 47, 73, 0.95)
+        ),
+        rgba(0, 0, 0, 0.9);
+      border-color: rgba(45, 212, 191, 1) !important;
+      color: #f9fafb;
+      box-shadow: 0 0 24px rgba(34, 211, 238, 0.85);
+    }
+
+    .nav-pill-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.75);
+    }
+
+    .nav-pill.active .nav-pill-dot {
+      background: #a5f3fc;
+      box-shadow: 0 0 10px rgba(34, 211, 238, 0.9);
+    }
+
+    .kbd-hint {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 0 32px 10px;
+      font-size: 11px;
+      color: var(--text-muted);
+      opacity: 0.7;
+    }
+
+    @media (max-width: 960px) {
+      .kbd-hint {
+        padding: 0 18px 10px;
+      }
+    }
+
+    main {
+      flex: 1;
+      padding: 10px 0 36px;
+    }
+
+    .grid-shell {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 0 32px;
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1.3fr);
+      gap: 18px;
+    }
+
+    @media (max-width: 1100px) {
+      .grid-shell {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    @media (max-width: 960px) {
+      .grid-shell {
+        padding: 0 18px;
+      }
+    }
+
+    .col {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .qd-card {
+      border-radius: var(--radius-xl);
+      padding: 18px 20px 18px;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      background:
+        radial-gradient(circle at top left, rgba(56, 189, 248, 0.18), transparent 65%),
+        radial-gradient(circle at bottom right, rgba(34, 211, 238, 0.12), transparent 60%),
+        linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(15, 23, 42, 0.96));
+      box-shadow: var(--shadow-soft);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .qd-card::before {
+      content: "";
+      position: absolute;
+      inset: -40%;
+      background-image: radial-gradient(
+        circle at top,
+        rgba(15, 23, 42, 0),
+        rgba(15, 23, 42, 0.9)
+      );
+      opacity: 0.6;
+      pointer-events: none;
+    }
+
+    .qd-card-inner {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .qd-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .qd-card-title-block {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .qd-card-kicker {
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(148, 163, 184, 0.9);
+    }
+
+    .qd-card-title {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .qd-card-subtitle {
+      font-size: 12px;
+      color: var(--text-soft);
+    }
+
+    .qd-card-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .chip {
+      font-size: 11px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      background: rgba(15, 23, 42, 0.96);
+      color: var(--text-soft);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .chip-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: rgba(148, 163, 184, 0.9);
+    }
+
+    .chip-pill {
+      margin-left: 4px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      background: linear-gradient(
+        135deg,
+        rgba(56, 189, 248, 0.12),
+        rgba(59, 130, 246, 0.2)
+      );
+      color: #e0f2fe;
+      border: 1px solid rgba(56, 189, 248, 0.6);
+    }
+
+    .qd-card-body {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      font-size: 13px;
+    }
+
+    .field-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .field-row > * {
+      flex: 1;
+    }
+
+    @media (max-width: 720px) {
+      .field-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+    }
+
+    label {
+      font-size: 12px;
+      color: var(--text-soft);
+      margin-bottom: 4px;
+    }
+
+    input[type="text"],
+    input[type="file"],
+    input[type="datetime-local"],
+    textarea,
+    select {
+      width: 100%;
+      padding: 9px 11px;
+      font-size: 13px;
+      border-radius: 999px;
+      border: 1px solid rgba(15, 23, 42, 0.95);
+      background: rgba(15, 23, 42, 0.96);
+      color: var(--text-main);
+      outline: none;
+      transition: border-color var(--transition-fast),
+        box-shadow var(--transition-fast), background var(--transition-fast),
+        transform 110ms ease-out;
+    }
+
+    input[type="datetime-local"] {
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+      cursor: pointer;
+      opacity: 0.7;
+      filter: invert(0.6) sepia(1) saturate(2) hue-rotate(180deg);
+      transition: opacity var(--transition-fast);
+    }
+
+    input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
+      opacity: 1;
+    }
+
+    input[type="datetime-local"].input-warning {
+      border-color: rgba(251, 191, 36, 0.8);
+      box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.6);
+    }
+
+    textarea {
+      border-radius: 18px;
+      min-height: 90px;
+      resize: vertical;
+      padding: 10px 12px;
+      line-height: 1.5;
+    }
+
+    input::placeholder,
+    textarea::placeholder {
+      color: var(--text-muted);
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus {
+      border-color: rgba(56, 189, 248, 0.9);
+      box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.8);
+      background: radial-gradient(
+          circle at top,
+          rgba(56, 189, 248, 0.22),
+          transparent 60%
+        ),
+        rgba(15, 23, 42, 0.96);
+      transform: translateY(-0.5px);
+    }
+
+    input[type="datetime-local"]:focus {
+      border-color: rgba(56, 189, 248, 0.9);
+      box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.8);
+      background: radial-gradient(
+          circle at top,
+          rgba(56, 189, 248, 0.22),
+          transparent 60%
+        ),
+        rgba(15, 23, 42, 0.96);
+      transform: translateY(-0.5px);
+    }
+
+    input[type="datetime-local"].input-warning:focus {
+      border-color: rgba(251, 191, 36, 0.9);
+      box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.7);
+    }
+
+    select {
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: linear-gradient(45deg, transparent 50%, #9ca3af 50%),
+        linear-gradient(135deg, #9ca3af 50%, transparent 50%);
+      background-position: calc(100% - 13px) 50%, calc(100% - 8px) 50%;
+      background-size: 6px 6px, 6px 6px;
+      background-repeat: no-repeat;
+      padding-right: 26px;
+    }
+
+    button {
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .btn {
+      font-size: 13px;
+      font-weight: 500;
+      padding: 8px 16px;
+      border-radius: 999px;
+      background: #0f172a;
+      color: #e5e7eb;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background var(--transition-fast),
+        transform 110ms ease-out, box-shadow var(--transition-fast),
+        border-color var(--transition-fast);
+    }
+
+    .btn-primary {
+      background: radial-gradient(circle at top, #22d3ee, #0ea5e9);
+      color: #020617;
+      border-color: rgba(8, 47, 73, 0.9);
+      box-shadow: 0 12px 40px rgba(8, 47, 73, 0.96);
+    }
+
+    .btn-secondary {
+      background: rgba(15, 23, 42, 0.98);
+      border-color: rgba(148, 163, 184, 0.6);
+      color: var(--text-soft);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      border-color: rgba(148, 163, 184, 0.4);
+      color: var(--text-soft);
+      font-size: 12px;
+      padding: 6px 12px;
+      box-shadow: none;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 36px rgba(15, 23, 42, 0.92);
+    }
+
+    .btn-primary:hover {
+      box-shadow: 0 18px 40px rgba(8, 47, 73, 0.96);
+      background: radial-gradient(circle at top, #22d3ee, #0369a1);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+      box-shadow: none;
+    }
+
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+
+    .status-line {
+      font-size: 12px;
+      color: var(--text-soft);
+      padding: 6px 10px 2px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px dashed rgba(148, 163, 184, 0.32);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      margin-right: 6px;
+    }
+
+    .status-dot.ok {
+      background: #22c55e;
+      box-shadow: 0 0 12px rgba(34, 197, 94, 0.9);
+    }
+
+    .status-dot.warn {
+      background: #facc15;
+      box-shadow: 0 0 12px rgba(250, 204, 21, 0.9);
+    }
+
+    .status-dot.err {
+      background: #f97373;
+      box-shadow: 0 0 12px rgba(248, 113, 113, 0.95);
+    }
+
+    .status-pill {
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.98);
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      color: var(--text-soft);
+    }
+
+    .status-pill.ok {
+      border-color: rgba(52, 211, 153, 0.8);
+      color: #bbf7d0;
+    }
+
+    .status-pill.warn {
+      border-color: rgba(250, 204, 21, 0.8);
+      color: #fef08a;
+    }
+
+    .status-pill.err {
+      border-color: rgba(248, 113, 113, 0.8);
+      color: #fecaca;
+    }
+
+    .meter {
+      width: 100%;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.92);
+      border: 1px solid rgba(15, 23, 42, 0.96);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .meter-fill {
+      position: absolute;
+      inset: 0;
+      width: 22%;
+      background: linear-gradient(
+        90deg,
+        rgba(34, 211, 238, 0.3),
+        rgba(56, 189, 248, 0.9),
+        rgba(34, 211, 238, 0.3)
+      );
+      box-shadow: 0 0 18px rgba(56, 189, 248, 0.8);
+      transform-origin: left;
+      animation: meterPulse 2600ms ease-in-out infinite alternate;
+    }
+
+    .meter-fill::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image: linear-gradient(
+        120deg,
+        rgba(15, 23, 42, 0.1) 0,
+        rgba(15, 23, 42, 0) 40%,
+        rgba(15, 23, 42, 0.2) 100%
+      );
+    }
+
+    @keyframes meterPulse {
+      0% {
+        transform: scaleX(0.35);
+      }
+      100% {
+        transform: scaleX(0.9);
+      }
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .pill {
+      font-size: 11px;
+      padding: 5px 11px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      color: rgba(209, 213, 219, 0.86);
+      cursor: default;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .pill.key {
+      border-color: rgba(56, 189, 248, 0.7);
+      background: radial-gradient(
+          circle at top left,
+          rgba(56, 189, 248, 0.3),
+          transparent 55%
+        ),
+        rgba(15, 23, 42, 0.96);
+      color: #e0f2fe;
+    }
+
+    .pill-key-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: #22d3ee;
+      box-shadow: 0 0 12px rgba(34, 211, 238, 0.9);
+    }
+
+    .qc-graph-wrapper {
+      position: relative;
+      padding: 2px;
+      border-radius: 20px;
+      background: linear-gradient(
+          135deg,
+          rgba(56, 189, 248, 0.25),
+          rgba(34, 211, 238, 0.2),
+          rgba(251, 191, 36, 0.15)
+        ),
+        rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.2),
+        inset 0 0 20px rgba(34, 211, 238, 0.1);
+    }
+
+    .qc-graph {
+      height: 140px;
+      border-radius: 18px;
+      background: radial-gradient(
+          circle at top left,
+          rgba(56, 189, 248, 0.18),
+          transparent 55%
+        ),
+        radial-gradient(
+          circle at bottom,
+          rgba(251, 191, 36, 0.12),
+          transparent 60%
+        ),
+        radial-gradient(
+          circle at top right,
+          rgba(251, 191, 36, 0.15),
+          transparent 55%
+        ),
+        rgba(15, 23, 42, 0.98);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .qc-graph::before,
+    .qc-graph::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      opacity: 0.3;
+      background-image: linear-gradient(
+          90deg,
+          rgba(148, 163, 184, 0.12) 1px,
+          transparent 1px
+        ),
+        linear-gradient(
+          180deg,
+          rgba(148, 163, 184, 0.12) 1px,
+          transparent 1px
+        );
+      background-size: 26px 18px;
+    }
+
+    .qc-graph::after {
+      opacity: 0.18;
+      filter: blur(1px);
+    }
+
+    .qc-lines {
+      position: absolute;
+      inset: 8px 10px 16px;
+      display: grid;
+      grid-template-columns: repeat(60, 1fr);
+      align-items: flex-end;
+      gap: 2px;
+    }
+
+    .qc-line {
+      border-radius: 9px 9px 0 0;
+      transform-origin: bottom;
+      opacity: 0.8;
+    }
+
+    .qc-line.lum {
+      background: linear-gradient(
+        to top,
+        rgba(56, 189, 248, 0.15),
+        rgba(56, 189, 248, 0.7)
+      );
+      height: 70%;
+      animation: lumWave 3800ms ease-in-out infinite alternate;
+      filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.5));
+    }
+
+    .qc-line.warn {
+      background: linear-gradient(
+        to top,
+        rgba(251, 191, 36, 0.1),
+        rgba(251, 191, 36, 0.65)
+      );
+      height: 40%;
+      animation: warnWave 2600ms ease-in-out infinite alternate;
+      filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.4));
+    }
+
+    .qc-line.fail {
+      background: linear-gradient(
+        to top,
+        rgba(251, 191, 36, 0.08),
+        rgba(251, 191, 36, 0.55)
+      );
+      height: 22%;
+      animation: failWave 4600ms ease-in-out infinite alternate;
+      filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.35));
+    }
+
+    .qc-legend {
+      position: absolute;
+      inset: auto 10px 6px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: rgba(209, 213, 219, 0.8);
+    }
+
+    .qc-legend-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .qc-legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .qc-legend-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+    }
+
+    .qc-dot-lum {
+      background: #22d3ee;
+      box-shadow: 0 0 8px rgba(34, 211, 238, 0.7);
+    }
+
+    .qc-dot-warn {
+      background: #fbbf24;
+      box-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
+    }
+
+    .qc-dot-fail {
+      background: #fbbf24;
+      box-shadow: 0 0 8px rgba(251, 191, 36, 0.5);
+      opacity: 0.8;
+    }
+
+    .qc-status {
+      font-size: 11px;
+      color: rgba(34, 211, 238, 0.95);
+      border-radius: 999px;
+      padding: 4px 9px;
+      background: rgba(8, 47, 73, 0.85);
+      border: 1px solid rgba(34, 211, 238, 0.7);
+      box-shadow: 0 0 12px rgba(34, 211, 238, 0.6);
+    }
+
+    @keyframes lumWave {
+      0% {
+        transform: scaleY(0.92);
+      }
+      100% {
+        transform: scaleY(1.05);
+      }
+    }
+
+    @keyframes warnWave {
+      0% {
+        transform: scaleY(0.82);
+      }
+      100% {
+        transform: scaleY(1.12);
+      }
+    }
+
+    @keyframes failWave {
+      0% {
+        transform: scaleY(0.78);
+      }
+      100% {
+        transform: scaleY(1.18);
+      }
+    }
+
+    .neon-path {
+      border-radius: 18px;
+      border: 1px solid rgba(148, 163, 184, 0.32);
+      background: radial-gradient(
+          circle at top left,
+          rgba(56, 189, 248, 0.28),
+          transparent 60%
+        ),
+        radial-gradient(
+          circle at bottom right,
+          rgba(34, 211, 238, 0.24),
+          transparent 60%
+        ),
+        rgba(15, 23, 42, 0.98);
+      padding: 12px 12px 10px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .neon-path::before {
+      content: "";
+      position: absolute;
+      inset: -40%;
+      background-image: radial-gradient(
+        circle at center,
+        rgba(15, 23, 42, 0),
+        rgba(15, 23, 42, 0.92)
+      );
+      opacity: 0.7;
+      pointer-events: none;
+    }
+
+    .neon-path-inner {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .neon-hops {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .neon-hop {
+      font-size: 11px;
+      padding: 5px 11px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      background: rgba(15, 23, 42, 0.96);
+      color: rgba(209, 213, 219, 0.9);
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: border-color var(--transition-fast), color var(--transition-fast),
+        box-shadow var(--transition-fast), transform 110ms ease-out,
+        background var(--transition-fast);
+    }
+
+    .neon-hop::before {
+      content: "";
+      position: absolute;
+      inset: -40%;
+      background: radial-gradient(
+        circle at top,
+        rgba(56, 189, 248, 0.3),
+        transparent 55%
+      );
+      opacity: 0;
+      transition: opacity var(--transition-fast);
+      pointer-events: none;
+    }
+
+    .neon-hop:hover {
+      border-color: rgba(56, 189, 248, 0.9);
+      color: #e0f2fe;
+      box-shadow: 0 0 22px rgba(56, 189, 248, 0.75);
+      transform: translateY(-1px);
+      background: rgba(15, 23, 42, 0.98);
+    }
+
+    .neon-hop:hover::before {
+      opacity: 1;
+    }
+
+    .neon-hop.active {
+      border-color: rgba(45, 212, 191, 1);
+      color: #f9fafb;
+      background: radial-gradient(
+          circle at top,
+          rgba(45, 212, 191, 0.4),
+          transparent 55%
+        ),
+        rgba(15, 23, 42, 0.98);
+      box-shadow: 0 0 24px rgba(45, 212, 191, 0.95);
+    }
+
+    .neon-scroll {
+      font-size: 11px;
+      color: var(--text-soft);
+      border-radius: 999px;
+      padding: 5px 9px;
+      background: rgba(15, 23, 42, 0.92);
+      border: 1px dashed rgba(148, 163, 184, 0.4);
+    }
+
+    .neon-scroll span {
+      color: rgba(56, 189, 248, 0.9);
+    }
+
+    .timeline {
+      margin-top: 8px;
+      font-size: 11px;
+      color: rgba(209, 213, 219, 0.86);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .timeline-steps {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .timeline-step {
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      background: rgba(15, 23, 42, 0.96);
+      color: rgba(209, 213, 219, 0.9);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .timeline-step-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.85);
+    }
+
+    .timeline-step.active .timeline-step-dot {
+      background: #22d3ee;
+      box-shadow: 0 0 12px rgba(34, 211, 238, 0.96);
+    }
+
+    .timeline-arrow {
+      font-size: 14px;
+      opacity: 0.4;
+    }
+
+    .kdm-dates {
+      display: flex;
+      gap: 8px;
+    }
+
+    .kdm-dates > div {
+      flex: 1;
+    }
+
+    .date-field {
+      position: relative;
+    }
+
+    .date-field input[type="datetime-local"] {
+      padding-right: 11px;
+    }
+
+    .date-helper {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .help-text {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    footer {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 10px 32px 20px;
+      font-size: 11px;
+      color: rgba(148, 163, 184, 0.86);
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      opacity: 0.85;
+    }
+
+    @media (max-width: 960px) {
+      footer {
+        padding: 10px 18px 20px;
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+
+    .footer-right {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .footer-pill {
+      font-size: 11px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.45);
+      background: rgba(15, 23, 42, 0.95);
+      color: rgba(148, 163, 184, 0.9);
+    }
+
+    .search-modal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1200;
+      background: radial-gradient(
+          circle at top,
+          rgba(15, 23, 42, 0.95),
+          rgba(15, 23, 42, 0.96)
+        ),
+        rgba(3, 7, 18, 0.96);
+      backdrop-filter: blur(30px);
+      -webkit-backdrop-filter: blur(30px);
+      opacity: 0;
+      transition: opacity var(--transition-fast);
+      pointer-events: none;
+    }
+
+    .search-modal.open {
+      display: flex;
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    body.modal-open {
+      overflow: hidden;
+    }
+
+    .search-inner {
+      width: min(680px, calc(100% - 40px));
+      border-radius: 28px;
+      padding: 16px 20px 14px;
+      border: 1px solid rgba(56, 189, 248, 0.6);
+      background: radial-gradient(
+          circle at top,
+          rgba(34, 211, 238, 0.45),
+          transparent 60%
+        ),
+        rgba(15, 23, 42, 0.98);
+      box-shadow: 0 0 40px rgba(34, 211, 238, 0.8);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      position: relative;
+      overflow: hidden;
+      z-index: 1;
+    }
+
+    .search-inner::before {
+      content: "";
+      position: absolute;
+      inset: -40%;
+      background-image: radial-gradient(
+        circle at center,
+        rgba(15, 23, 42, 0),
+        rgba(15, 23, 42, 0.98)
+      );
+      opacity: 0.75;
+      pointer-events: none;
+    }
+
+    .search-input-wrap {
+      position: relative;
+      border-radius: 999px;
+      padding: 4px;
+      background: radial-gradient(
+        circle at top left,
+        rgba(15, 23, 42, 0.1),
+        rgba(15, 23, 42, 0.9)
+      );
+      box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.96),
+        inset 0 0 0 1px rgba(15, 23, 42, 0.96);
+      z-index: 2;
+    }
+
+    .search-input {
+      width: 100%;
+      border-radius: 999px;
+      border: 1px solid rgba(15, 23, 42, 0.96);
+      background: rgba(15, 23, 42, 0.98);
+      padding: 10px 14px;
+      font-size: 14px;
+      color: #e5e7eb;
+      outline: none;
+      transition: border-color var(--transition-fast),
+        box-shadow var(--transition-fast), background var(--transition-fast);
+    }
+
+    .search-input:focus {
+      border-color: rgba(56, 189, 248, 0.95);
+      box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.9);
+      background: radial-gradient(
+          circle at top,
+          rgba(56, 189, 248, 0.25),
+          transparent 60%
+        ),
+        rgba(15, 23, 42, 0.98);
+    }
+
+    .search-hint {
+      font-size: 11px;
+      color: rgba(148, 163, 184, 0.96);
+      padding-left: 4px;
+      margin-top: 3px;
+    }
+
+    .search-options {
+      margin-top: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      font-size: 11px;
+      color: rgba(148, 163, 184, 0.9);
+    }
+
+    .search-option {
+      padding: 4px 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.45);
+      background: rgba(15, 23, 42, 0.96);
+      cursor: pointer;
+      transition: border-color var(--transition-fast),
+        box-shadow var(--transition-fast), color var(--transition-fast),
+        transform 110ms ease-out;
+      position: relative;
+      z-index: 2;
+    }
+
+    .search-option:hover {
+      border-color: rgba(56, 189, 248, 0.9);
+      color: #e0f2fe;
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.75);
+      transform: translateY(-1px);
+    }
+
+    pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+        "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      background: rgba(15, 23, 42, 0.98);
+      border-radius: 14px;
+      padding: 10px 12px;
+      color: rgba(209, 213, 219, 0.9);
+      border: 1px solid rgba(30, 64, 175, 0.7);
+      overflow-x: auto;
+    }
+
+    code {
+      font-family: inherit;
+      font-size: 12px;
+      color: rgba(209, 213, 219, 0.9);
+    }
+
+    .muted {
+      color: var(--text-muted);
+    }
+
+    .dev-toast {
+      position: fixed;
+      bottom: 32px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      padding: 10px 18px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.98);
+      border: 1px solid rgba(56, 189, 248, 0.6);
+      color: var(--text-main);
+      font-size: 12px;
+      box-shadow: 0 4px 20px rgba(56, 189, 248, 0.3),
+        0 0 24px rgba(34, 211, 238, 0.4);
+      z-index: 2000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity var(--transition-slow),
+        transform var(--transition-slow);
+      max-width: min(600px, calc(100% - 40px));
+      text-align: center;
+    }
+
+    .dev-toast:not(.dev-toast-hidden) {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+      pointer-events: auto;
+    }
+
+    @media (max-width: 720px) {
+      .brand-title {
+        font-size: 18px;
+      }
+      .brand-subtitle {
+        font-size: 11px;
+      }
+      .header-inner {
+        padding-top: 12px;
+      }
+      .nav-pills {
+        padding-top: 6px;
+      }
+      .qd-card {
+        padding: 16px 14px 16px;
+      }
+      .grid-shell {
+        padding: 0 14px;
+      }
+      footer {
+        padding: 10px 14px 22px;
+      }
+      .dev-toast {
+        bottom: 24px;
+        max-width: calc(100% - 32px);
+        font-size: 11px;
+        padding: 8px 14px;
+      }
+
+      .date-input {
+        padding: 10px 14px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        background: rgba(255, 255, 255, 0.05);
+        color: #e5e7eb;
+      }
+    }
+  </style>
 </head>
 <body>
-<div id="bg-stars"></div>
-<div id="bg-grid"></div>
-<div id="fog-layer"></div>
-<div id="audio-ring"></div>
+  <div class="bg-texture"></div>
+<div class="app-shell">
+    <header>
+      <div class="header-inner">
+        <div class="brand">
+          <div class="brand-logo">
+            <img src="QuickDCP-logo300.png" alt="QuickDCP" />
+          </div>
+          <div class="brand-text">
+            <div class="brand-title">QuickDCP — System Core</div>
+            <div class="brand-subtitle">
+              Observatory · Lab · Neon Core · Zero-Trust Vault
+            </div>
+          </div>
+        </div>
+        <div class="header-right">
+          <div class="env-pill">
+            <span class="dot-small"></span>
+            <span>LOCAL DEV NODE</span>
+          </div>
+          <div id="apiStatus" class="api-status">
+            <span class="api-dot"></span>
+            <span id="apiStatusText">API: offline (check container)</span>
+          </div>
+        </div>
+      </div>
+      <div class="nav-pills">
+        <button class="nav-pill active" data-panel="upload">
+          <span class="nav-pill-dot"></span>
+          Upload
+        </button>
+        <button class="nav-pill" data-panel="jobs">
+          <span class="nav-pill-dot"></span>
+          Jobs
+        </button>
+        <button class="nav-pill" data-panel="qc">
+          <span class="nav-pill-dot"></span>
+          QC
+        </button>
+        <button class="nav-pill" data-panel="proof">
+          <span class="nav-pill-dot"></span>
+          Proof
+        </button>
+        <button class="nav-pill" data-panel="worker">
+          <span class="nav-pill-dot"></span>
+          Worker
+        </button>
+        <button class="nav-pill" data-panel="kdm">
+          <span class="nav-pill-dot"></span>
+          KDM
+        </button>
+        <button class="nav-pill" data-panel="vault">
+          <span class="nav-pill-dot"></span>
+          Vault
+        </button>
+      </div>
+      <div class="kbd-hint">⌘K / Ctrl+K · Jump to panel</div>
+  </header>
 
-<!-- COMMAND PALETTE -->
-<div id="cmdk">
-  <div id="cmdk-panel">
-    <input id="cmdk-input" placeholder="Type a command… (upload, job, proof, verify, kdm)" />
-    <div id="cmdk-list"></div>
+    <main>
+      <div class="grid-shell">
+        <div class="col">
+        <!-- 1. Upload Files -->
+        <section id="panel-upload" class="qd-card">
+          <div class="qd-card-inner">
+            <div class="qd-card-header">
+              <div class="qd-card-title-block">
+                <div class="qd-card-kicker">1. Upload Files</div>
+                <div class="qd-card-title">
+                  Stream source packages into the QuickDCP ingest bucket.
+                </div>
+                <div class="qd-card-subtitle">
+                  Drag masters in, get a traceable ingest record out.
+                </div>
+              </div>
+              <div class="qd-card-actions">
+                <button class="btn btn-sm btn-secondary" id="btnUploadToS3">
+                  Ingest → S3 bucket
+                </button>
+              </div>
+            </div>
+            <div class="qd-card-body">
+              <div>
+                <label for="fileInput">Select files</label>
+                <input id="fileInput" type="file" multiple />
+                <div class="help-text">
+                  This console fakes the upload call but mirrors real API
+                  parameters.
+                </div>
+              </div>
+              <div>
+                <label for="urlInput">Or ingest from URL</label>
+                <div class="field-row">
+                  <input id="urlInput" type="text" placeholder="https://…" />
+                  <button class="btn btn-primary" id="btnIngestUrl">
+                    Ingest from URL
+                  </button>
+                </div>
+              </div>
+              <div class="field-row">
+                <button class="btn btn-primary" id="btnUpload">Upload</button>
+                <button class="btn btn-ghost" id="btnUploadClear">
+                  Clear
+                </button>
+              </div>
+              <div class="status-line">
+                <span id="uploadStatusText">
+                  <span class="status-dot ok"></span>
+                  Ready. Select a CPL or picture/audio masters and hit
+                  <strong>Upload</strong>.
+                </span>
+                <span class="status-pill ok" id="uploadStatusPill">Idle</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. Jobs (Lab Console) -->
+        <section id="panel-jobs" class="qd-card">
+          <div class="qd-card-inner">
+            <div class="qd-card-header">
+              <div class="qd-card-title-block">
+                <div class="qd-card-kicker">2. Jobs (Lab Console)</div>
+                <div class="qd-card-title">
+                  Describe a render job exactly as the scheduler would.
+                </div>
+                <div class="qd-card-subtitle">
+                  In production, this is injected by the orchestration layer.
+                </div>
+              </div>
+              <div class="qd-card-actions">
+                <button class="btn btn-sm btn-secondary" id="btnRenderQueue">
+                  Render queue
+                </button>
+              </div>
+            </div>
+            <div class="qd-card-body">
+              <div class="field-row">
+                <div>
+                  <label for="jobId">Job ID</label>
+                  <input
+                    type="text"
+                    id="jobId"
+                    value="JOB-001"
+                    placeholder="JOB-123 or external ref"
+                  />
+                </div>
+                <div>
+                  <label for="resolution">Resolution</label>
+                  <select id="resolution">
+                    <option>2K Flat / Scope</option>
+                    <option>4K Flat / Scope</option>
+                    <option>IMAX variant</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="formatProfile">Format profile</label>
+                  <select id="formatProfile">
+                    <option>DCI Flat 1.85:1 @ 24 fps</option>
+                    <option>DCI Scope 2.39:1 @ 24 fps</option>
+                    <option>DCI Flat @ 25 fps</option>
+                    <option>Custom festival profile</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field-row">
+                <div>
+                  <label for="audioLayout">Audio layout</label>
+                  <select id="audioLayout">
+                    <option>5.1</option>
+                    <option>7.1</option>
+                    <option>7.1 + HI/VI</option>
+                    <option>Atmos (JO only)</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="priority">Priority &amp; budget</label>
+                  <select id="priority">
+                    <option>Normal (lab)</option>
+                    <option>Rush (festival)</option>
+                    <option>Archive (background)</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label for="jobNotes">Job notes (internal)</label>
+                <textarea
+                  id="jobNotes"
+                  placeholder="Reel split, subtitles, color notes, special instructions…"
+                ></textarea>
+              </div>
+              <div class="field-row">
+                <button class="btn btn-primary" id="btnCreateJob">
+                  Create render job
+                </button>
+              </div>
+              <div class="status-line">
+                <span>
+                  <span class="status-dot"></span>
+                  No job yet. Fill out resolution/format and hit
+                  <strong>Create render job</strong>.
+                </span>
+                <span class="status-pill">Queue: 0 jobs</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 3. QC & Status -->
+        <section id="panel-qc" class="qd-card">
+          <div class="qd-card-inner">
+            <div class="qd-card-header">
+              <div class="qd-card-title-block">
+                <div class="qd-card-kicker">
+                  3. QC &amp; Status (Holographic)
+                </div>
+                <div class="qd-card-title">
+                  Live job telemetry: waveforms, hashes, reel warnings.
+                </div>
+                <div class="qd-card-subtitle">
+                  Simulated telemetry in dev mode; wired in production.
+                </div>
+              </div>
+              <div class="qd-card-actions">
+                <button class="btn btn-sm btn-secondary">
+                  Waveform · Hashes · Warnings
+                </button>
+              </div>
+            </div>
+            <div class="qd-card-body">
+              <div class="field-row">
+                <button class="btn btn-primary" id="btnPollJob">
+                  Poll current job
+                </button>
+              </div>
+              <div class="qc-graph-wrapper">
+                <div class="qc-graph">
+                  <div class="qc-lines" id="qcLines"></div>
+                  <div class="qc-legend">
+                    <div class="qc-legend-left">
+                      <div class="qc-legend-item">
+                        <span class="qc-legend-dot qc-dot-lum"></span>
+                        <span>Luminance</span>
+                      </div>
+                      <div class="qc-legend-item">
+                        <span class="qc-legend-dot qc-dot-warn"></span>
+                        <span>Warnings</span>
+                      </div>
+                      <div class="qc-legend-item">
+                        <span class="qc-legend-dot qc-dot-fail"></span>
+                        <span>Failures</span>
+                      </div>
+                    </div>
+                    <div class="qc-status">Per-reel status: Clean</div>
+                  </div>
+                </div>
+              </div>
+              <div class="status-line">
+                <span
+                  >Hit <strong>Poll current job</strong> to simulate live QC
+                  for the active job.</span
+                >
+                <span class="status-pill">Idle</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. Proof & Verify -->
+        <section id="panel-proof" class="qd-card">
+          <div class="qd-card-inner">
+            <div class="qd-card-header">
+              <div class="qd-card-title-block">
+                <div class="qd-card-kicker">4. Proof &amp; Verify</div>
+                <div class="qd-card-title">
+                  RFC-3161 TSQ + manifest verification for zero-trust chains.
+                </div>
+                <div class="qd-card-subtitle">
+                  Deterministic manifests, TSA timestamps, offline
+                  verification.
+                </div>
+              </div>
+              <div class="qd-card-actions">
+                <div class="chip">
+                  <span class="chip-label">Profile</span>
+                  <span class="chip-pill">RFC-3161 · eIDAS-ready</span>
+                </div>
+              </div>
+            </div>
+            <div class="qd-card-body">
+              <div class="field-row">
+                <button class="btn btn-primary btn-sm" id="btnInitProof">
+                  Init proof (TSQ)
+                </button>
+                <button class="btn btn-secondary btn-sm" id="btnFetchManifest">
+                  Fetch manifest
+                </button>
+              </div>
+              <div>
+                <label for="tsrInput">TSR (base64)</label>
+                <textarea
+                  id="tsrInput"
+                  placeholder="Paste TSA response here after submitting TSQ."
+                ></textarea>
+              </div>
+              <div class="field-row">
+                <button class="btn btn-primary" id="btnAckTSA">
+                  ACK TSA
+                </button>
+              </div>
+              <div>
+                <label for="verifyRef">Verify reference</label>
+                <input
+                  type="text"
+                  id="verifyRef"
+                  placeholder="manifest_sha256 or JO"
+                />
+              </div>
+              <div class="field-row">
+                <button class="btn btn-primary" id="btnVerifyProof">
+                  Verify
+                </button>
+              </div>
+              <div class="status-line">
+                <span>
+                  <span class="status-dot"></span>
+                  Proof idle. Use <strong>Init proof</strong> to request a
+                  TSQ, then ACK TSA and Verify.
+                </span>
+                <span class="status-pill">Status: idle</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+        <!-- Right column -->
+        <div class="col">
+        <!-- 5. Worker Status -->
+        <section id="panel-worker" class="qd-card">
+          <div class="qd-card-inner">
+            <div class="qd-card-header">
+              <div class="qd-card-title-block">
+                <div class="qd-card-kicker">5. Worker Status</div>
+                <div class="qd-card-title">
+                  QuickDCP render + QC engine heartbeat.
+                </div>
+                <div class="qd-card-subtitle">
+                  Workers pull jobs from the queue; this card checks their
+                  pulse.
+                </div>
+              </div>
+              <div class="qd-card-actions">
+                <button class="btn btn-sm btn-secondary" id="btnWorkerEngine">
+                  Render &amp; QC engine
+                </button>
+              </div>
+            </div>
+            <div class="qd-card-body">
+              <div class="field-row">
+                <button class="btn btn-primary" id="btnRefreshWorkers">
+                  Refresh
+                </button>
+              </div>
+              <div class="status-line">
+                <span>
+                  <span class="status-dot" id="workerStatusDot"></span>
+                  <span id="workerStatusText">checking /internal/health…</span>
+                </span>
+                <span class="status-pill" id="workerStatusSummary">
+                  Workers: offline
+                </span>
+              </div>
+              <div class="meter">
+                <div class="meter-fill"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 6. Neon System Graph -->
+        <section id="panel-neon" class="qd-card">
+          <div class="qd-card-inner">
+            <div class="qd-card-header">
+              <div class="qd-card-title-block">
+                <div class="qd-card-kicker">6. Neon System Graph</div>
+                <div class="qd-card-title">
+                  One-click trace of the full data path for any job.
+                </div>
+                <div class="qd-card-subtitle">
+                  Hover or click on a hop to see how packets flow through
+                  QuickDCP.
+                </div>
+              </div>
+              <div class="qd-card-actions">
+                <button class="btn btn-sm btn-secondary">
+                  Data path overview
+                </button>
+              </div>
+            </div>
+            <div class="qd-card-body">
+              <div class="neon-path">
+                <div class="neon-path-inner">
+                  <div class="neon-hops" id="neonHops">
+                    <button class="neon-hop active" data-hop="upload">
+                      Upload
+                    </button>
+                    <button class="neon-hop" data-hop="ingest">
+                      Ingest S3
+                    </button>
+                    <button class="neon-hop" data-hop="queue">
+                      Worker queue
+                    </button>
+                    <button class="neon-hop" data-hop="encode">
+                      Encode/QC
+                    </button>
+                    <button class="neon-hop" data-hop="manifest">
+                      Manifest
+                    </button>
+                    <button class="neon-hop" data-hop="tsa">TSA</button>
+                    <button class="neon-hop" data-hop="filmpassport">
+                      FilmPassport
+                    </button>
+                    <button class="neon-hop" data-hop="verify">
+                      Verify API
+                    </button>
+                    <button class="neon-hop" data-hop="vault">Vault</button>
+                    <button class="neon-hop" data-hop="kdm">KDM</button>
+                  </div>
+                  <div class="neon-scroll">
+                    Upload → Ingest S3 → Worker queue → Encode/QC → Manifest →
+                    TSA → Verify API → Vault → KDM
+                  </div>
+                </div>
+                <div class="timeline">
+                  <div>Workers pull jobs, run encoding + QC passes, then write outputs and telemetry.</div>
+                  <div class="timeline-steps" id="timelineSteps"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 7. KDM Matrix (Batch) -->
+        <section id="panel-kdm" class="qd-card">
+          <div class="qd-card-inner">
+            <div class="qd-card-header">
+              <div class="qd-card-title-block">
+                <div class="qd-card-kicker">7. KDM Matrix (Batch)</div>
+                <div class="qd-card-title">
+                  Generate per-cinema keys with explicit validity windows.
+                </div>
+                <div class="qd-card-subtitle">
+                  Paste cinema certificates, choose a window, preview before issuing.
+                </div>
+              </div>
+              <div class="qd-card-actions">
+                <button class="btn btn-sm btn-secondary">
+                  Per-cinema keys
+                </button>
+              </div>
+            </div>
+            <div class="qd-card-body">
+              <div>
+                <label for="kdmRecipients"
+                  >Recipient certificates (one per line)</label
+                >
+                <textarea
+                  id="kdmRecipients"
+                  placeholder="-----BEGIN CERTIFICATE----- …"
+                ></textarea>
+              </div>
+              <div class="kdm-dates">
+                <div>
+                  <label for="kdmValidFrom">Valid From</label>
+                  <div class="date-field">
+                    <input
+                      id="kdmValidFrom"
+                      type="datetime-local"
+                      class="date-input"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label for="kdmValidUntil">Valid Until</label>
+                  <div class="date-field">
+                    <input
+                      id="kdmValidUntil"
+                      type="datetime-local"
+                      class="date-input"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div class="date-helper">
+                Dates here are dev stubs. In production, this opens a calendar
+                picker with local timezone handling.
+              </div>
+              <div class="field-row">
+                <button class="btn btn-primary" id="btnKdmPreview">
+                  Generate KDM preview
+                </button>
+              </div>
+              <div class="status-line">
+                <span id="kdmPreviewStatus">
+                  No preview generated yet. Paste certificates, choose dates
+                  and click <strong>Generate KDM preview</strong>.
+                </span>
+                <span class="status-pill">Preview only</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 8. Zero-Trust Vault -->
+        <section id="panel-vault" class="qd-card">
+          <div class="qd-card-inner">
+            <div class="qd-card-header">
+              <div class="qd-card-title-block">
+                <div class="qd-card-kicker">
+                  8. Zero-Trust Vault (Forensic)
+                </div>
+                <div class="qd-card-title">
+                  Immutable manifest, TSA evidence and lineage graph.
+                </div>
+                <div class="qd-card-subtitle">
+                  Everything that ever happened to a job, frozen and provable.
+                </div>
+              </div>
+              <div class="qd-card-actions">
+                <button class="btn btn-sm btn-secondary">
+                  Lineage &amp; object lock
+                </button>
+              </div>
+            </div>
+            <div class="qd-card-body">
+              <div class="field-row">
+                <div>
+                  <label>Last manifest hash</label>
+                  <div class="status-pill">—</div>
+                </div>
+                <div>
+                  <label>TSA status</label>
+                  <div class="status-pill warn">Pending (dev stub)</div>
+                </div>
+              </div>
+              <div class="field-row">
+                <div>
+                  <label>FP verification</label>
+                  <div class="status-pill">Not linked</div>
+                </div>
+                <div>
+                  <label>Object lock (S3)</label>
+                  <div class="status-pill ok">Enabled</div>
+                </div>
+              </div>
+              <div>
+                <label>Lineage chain</label>
+                <div class="status-pill">
+                  Upload → QC → Proof (awaiting TSQ)
+                </div>
+              </div>
+              <div class="help-text">
+                Dev mode: data is simulated. In production this card reflects
+                the real zero-trust evidence chain for each job.
+              </div>
+              <div class="help-text">
+                Offline verification:
+                <code>openssl ts -verify …</code>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+      <div>QuickDCP · Local System Core · UI dev console</div>
+      <div class="footer-right">
+        <div class="footer-pill">FilmPassport-ready</div>
+        <div class="footer-pill">Zero-Trust Vault</div>
+        <div class="footer-pill">Kaaffilm infrastructure</div>
+    </div>
+  </footer>
+
+  <!-- Dev toast -->
+  <div id="dev-toast" class="dev-toast dev-toast-hidden"></div>
+
+  <!-- Command palette -->
+  <div id="searchModal" class="search-modal" role="dialog" aria-modal="true" aria-labelledby="searchModalTitle">
+    <div class="search-inner">
+      <div class="search-input-wrap">
+        <input
+          id="searchInput"
+          class="search-input"
+          type="text"
+          placeholder="Jump to: upload, jobs, qc, proof, worker, kdm, vault…"
+          aria-label="Search panels"
+          autocomplete="off"
+        />
+      </div>
+      <div class="search-hint">
+        Try: <code>upload</code>, <code>jobs</code>, <code>qc</code>,
+        <code>proof</code>, <code>worker</code>, <code>kdm</code>,
+        <code>vault</code>. Press Esc to close.
+      </div>
+      <div class="search-options">
+        <div class="search-option" data-section="upload">Upload</div>
+        <div class="search-option" data-section="jobs">Jobs</div>
+        <div class="search-option" data-section="qc">QC &amp; Status</div>
+        <div class="search-option" data-section="proof">Proof &amp; Verify</div>
+        <div class="search-option" data-section="worker">Worker Status</div>
+        <div class="search-option" data-section="kdm">KDM Matrix</div>
+        <div class="search-option" data-section="neon">Neon System Graph</div>
+        <div class="search-option" data-section="vault">
+          Zero-Trust Vault
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
-<header>
-  <div class="header-inner">
-    <div class="brand">
-      <h1>QuickDCP — System Core</h1>
-      <div class="sub">Observatory · Lab · Neon Core · Zero‑Trust Vault</div>
-    </div>
-    <div class="nav">
-      <button onclick="scrollToSection('upload')">Upload</button>
-      <button onclick="scrollToSection('jobs')">Jobs</button>
-      <button onclick="scrollToSection('qc')">QC</button>
-      <button onclick="scrollToSection('proof')">Proof</button>
-      <button onclick="scrollToSection('worker')">Worker</button>
-      <button onclick="scrollToSection('kdm')">KDM</button>
-      <button onclick="scrollToSection('vault')">Vault</button>
-    </div>
-  </div>
-</header>
-
-<main>
-  <div class="layout">
-    <!-- LEFT COLUMN: Upload / Jobs / QC / Proof -->
-    <div>
-      <section id="upload" class="card">
-        <h2>1. Upload Files</h2>
-        <label>Select Files</label>
-        <input type="file" id="files" multiple />
-        <button style="margin-top:8px;" onclick="uploadMultiple()">Upload</button>
-        <div id="upload_list" style="margin-top:10px;"></div>
-      </section>
-
-      <section id="jobs" class="card">
-        <h2>2. Jobs (Lab Console)</h2>
-        <div class="row">
-          <div style="flex:2; min-width:160px;">
-            <label>Job ID</label>
-            <input id="job_id" placeholder="JOB-001" />
-          </div>
-          <div style="flex:1; min-width:120px;">
-            <label>Resolution</label>
-            <select id="res">
-              <option value="2K">2K</option>
-              <option value="4K">4K</option>
-            </select>
-          </div>
-        </div>
-        <button onclick="renderJob()">Create Render Job</button>
-        <pre id="render_out"></pre>
-      </section>
-
-      <section id="qc" class="card">
-        <h2>3. QC & Status (Holographic)</h2>
-        <button onclick="pollJob()">Poll Current Job</button>
-        <pre id="poll_out"></pre>
-        <div id="qc_vis" class="card" style="margin-top:14px; padding:14px; background:rgba(5,18,22,0.92); box-shadow:none;">
-          <div>QC Graph (placeholder)</div>
-        </div>
-      </section>
-
-      <section id="proof" class="card">
-        <h2>4. Proof & Verify</h2>
-        <div class="row">
-          <button onclick="proofInit()">Init Proof (TSQ)</button>
-          <button onclick="fetchManifest()">Fetch Manifest</button>
-        </div>
-        <pre id="tsq_out"></pre>
-        <label style="margin-top:10px;">TSR (base64)</label>
-        <textarea id="tsr" rows="3"></textarea>
-        <button style="margin-top:8px;" onclick="ackTSA()">ACK TSA</button>
-        <pre id="tsr_out"></pre>
-
-        <label style="margin-top:10px;">Verify Reference</label>
-        <input id="verify_ref" placeholder="manifest_sha256 or JOB-ID" />
-        <button style="margin-top:6px;" onclick="verifyRef()">Verify</button>
-        <pre id="verify_out"></pre>
-      </section>
-    </div>
-
-    <!-- RIGHT COLUMN: Worker, Node Map, KDM Matrix, Forensic Vault -->
-    <div>
-      <section id="worker" class="card">
-        <h2>5. Worker Status</h2>
-        <div class="row">
-          <span class="badge" id="worker_state">checking…</span>
-          <button onclick="pingWorker()">Refresh</button>
-        </div>
-        <pre id="worker_out"></pre>
-      </section>
-
-      <section class="card">
-        <h2>6. Neon System Graph</h2>
-        <div id="node-map">
-          <div class="node">Upload</div>
-          <div class="node">Ingest S3</div>
-          <div class="node">Worker Queue</div>
-          <div class="node">Encode/QC</div>
-          <div class="node">Manifest</div>
-          <div class="node">TSA</div>
-          <div class="node">FilmPassport</div>
-          <div class="node">Verify API</div>
-          <div class="node">Vault</div>
-          <div class="node">KDM</div>
-        </div>
-      </section>
-
-      <section id="kdm" class="card">
-        <h2>7. KDM Matrix (Batch)</h2>
-        <label>Recipient Certificates (one per line)</label>
-        <textarea id="kdm_batch" rows="4"></textarea>
-        <div class="row" style="margin-top:10px;">
-          <div style="flex:1; min-width:140px;">
-            <label>Valid From</label>
-            <input type="datetime-local" id="valid_from" />
-          </div>
-          <div style="flex:1; min-width:140px;">
-            <label>Valid Until</label>
-            <input type="datetime-local" id="valid_until" />
-          </div>
-        </div>
-        <button onclick="kdmBatch()">Generate KDM Preview</button>
-        <div class="row" id="kdm_grid" style="margin-top:10px; flex-wrap:wrap;"></div>
-        <pre id="kdm_out"></pre>
-      </section>
-
-      <section id="vault" class="card">
-        <h2>8. Zero‑Trust Vault (Forensic)</h2>
-        <div id="forensic">
-          <div><span class="label">Last Manifest Hash:</span> <span id="fz_hash">—</span></div>
-          <div><span class="label">TSA Status:</span> <span id="fz_tsa">—</span></div>
-          <div><span class="label">FP Verification:</span> <span id="fz_fp">—</span></div>
-          <div><span class="label">Object Lock:</span> <span id="fz_lock">—</span></div>
-          <div><span class="label">Lineage Chain:</span> <span id="fz_lineage">—</span></div>
-        </div>
-      </section>
-    </div>
-  </div>
-</main>
-
 <script>
-const CUST = "demo";
-const KEY = "demo";
+    const API_BASE = window.API_BASE || "http://localhost:8080";
 
-// Smooth scroll nav
-function scrollToSection(id){
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.scrollIntoView({behavior:'smooth', block:'start'});
-}
+    let devToastTimer = null;
 
-// AUDIO REACTIVE RING
-let analyser, dataArray;
-async function setupAudioReactive(){
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({audio:true});
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const source = audioCtx.createMediaStreamSource(stream);
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 256;
-    dataArray = new Uint8Array(analyser.frequencyBinCount);
-    source.connect(analyser);
-    animateRing();
-  } catch(e) {}
-}
-function animateRing(){
-  requestAnimationFrame(animateRing);
-  if (!analyser) return;
-  analyser.getByteFrequencyData(dataArray);
-  const avg = dataArray.reduce((a,b)=>a+b,0) / dataArray.length;
-  const ring = document.getElementById('audio-ring');
-  const scale = 0.5 + (avg/255)*0.7;
-  ring.style.transform = `translate(-50%, -50%) scale(${scale})`;
-  ring.style.opacity = 0.1 + (avg/255)*0.5;
-}
-setupAudioReactive();
+    function showDevHint(message) {
+      const toast = document.getElementById("dev-toast");
+      if (!toast) return;
 
-// COMMAND PALETTE
-const cmdk = document.getElementById('cmdk');
-const cmdInput = document.getElementById('cmdk-input');
-const cmdList = document.getElementById('cmdk-list');
-const commands = [
-  {label:'Upload files', fn:'uploadMultiple'},
-  {label:'Create render job', fn:'renderJob'},
-  {label:'Poll current job', fn:'pollJob'},
-  {label:'Init proof', fn:'proofInit'},
-  {label:'Fetch manifest', fn:'fetchManifest'},
-  {label:'Verify reference', fn:'verifyRef'},
-  {label:'KDM batch preview', fn:'kdmBatch'}
-];
+      // Clear existing timer
+      if (devToastTimer) {
+        clearTimeout(devToastTimer);
+        devToastTimer = null;
+      }
 
-function openCmd(){ cmdk.style.display='flex'; cmdInput.value=''; renderCmdList(''); cmdInput.focus(); }
-function closeCmd(){ cmdk.style.display='none'; }
-function renderCmdList(q){
-  const ql = q.toLowerCase();
-  cmdList.innerHTML='';
-  commands
-    .filter(c=>c.label.toLowerCase().includes(ql))
-    .forEach(c=>{
-      const div = document.createElement('div');
-      div.textContent = c.label;
-      div.onclick = ()=>{ closeCmd(); if (window[c.fn]) window[c.fn](); };
-      cmdList.appendChild(div);
-    });
-}
-cmdInput.addEventListener('input', e=>renderCmdList(e.target.value));
-window.addEventListener('keydown', e=>{
-  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase()==='k') { e.preventDefault(); cmdk.style.display==='flex' ? closeCmd() : openCmd(); }
-  if (e.key==='Escape' && cmdk.style.display==='flex') closeCmd();
-});
+      // Set message and show
+      toast.textContent = message;
+      toast.classList.remove("dev-toast-hidden");
 
-// SIMPLE STUBS FOR CORE ACTIONS (wire to API later)
-async function uploadMultiple(){
-  const files = [...document.getElementById('files').files];
-  const list = document.getElementById('upload_list');
-  list.innerHTML='';
-  for(const f of files){
-    const row = document.createElement('div');
-    row.style.marginBottom = '8px';
-    row.innerHTML = `<div style="font-size:12px;opacity:0.9;">${f.name}</div><div class="progress-bar"><div></div></div>`;
-    list.appendChild(row);
-    const bar = row.querySelector('.progress-bar > div');
-    let p = 0; const id = setInterval(()=>{ p+=10; bar.style.width=p+'%'; if(p>=100) clearInterval(id); },50);
+      // Hide after 4 seconds
+      devToastTimer = setTimeout(() => {
+        toast.classList.add("dev-toast-hidden");
+        devToastTimer = null;
+      }, 4000);
+    }
+
+    function scrollToPanel(section) {
+      const sectionId = `panel-${section}`;
+      const el = document.getElementById(sectionId);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
   }
-}
 
-function renderJob(){
-  const jobId = document.getElementById('job_id').value || 'JOB-001';
-  const res = document.getElementById('res').value;
-  document.getElementById('render_out').textContent = `Job scheduled: ${jobId} (${res})`;
-}
+    function updateApiStatus(ok) {
+      const el = document.getElementById("apiStatus");
+      const textEl = document.getElementById("apiStatusText");
+      if (!el || !textEl) return;
+      if (ok) {
+        el.classList.add("ok");
+        textEl.textContent = "API: online";
+      } else {
+        el.classList.remove("ok");
+        textEl.textContent = "API: offline (check container)";
+      }
+    }
 
-function pollJob(){
-  document.getElementById('poll_out').textContent = 'Polling job… (wire to /jobs/:id)';
-}
+    async function pingApi() {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        
+        const res = await fetch(`${API_BASE}/healthz`, {
+          method: "GET",
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        updateApiStatus(res.ok);
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          // Timeout
+          updateApiStatus(false);
+        } else {
+          // Network or other error
+          updateApiStatus(false);
+        }
+      }
+    }
 
-function proofInit(){
-  document.getElementById('tsq_out').textContent = 'Proof init requested (wire to /proof/init)';
-}
-
-function fetchManifest(){
-  document.getElementById('tsq_out').textContent += '\nFetch manifest (wire to /jobs/:id)';
-}
-
-function ackTSA(){
-  document.getElementById('tsr_out').textContent = 'TSR received (wire to /proof/ack/tsa)';
-}
-
-function verifyRef(){
-  const ref = document.getElementById('verify_ref').value;
-  document.getElementById('verify_out').textContent = `Verify ${ref} (wire to /verify/:ref)`;
-}
-
-function kdmBatch(){
-  const raw = document.getElementById('kdm_batch').value.trim().split(/\n+/).filter(Boolean);
-  const grid = document.getElementById('kdm_grid');
-  grid.innerHTML='';
-  raw.forEach((line,i)=>{
-    const cell = document.createElement('div');
-    cell.className='badge';
-    cell.textContent = `KDM ${i+1}`;
-    grid.appendChild(cell);
+    function initNav() {
+      const pills = document.querySelectorAll(".nav-pill");
+      pills.forEach((pill) => {
+        pill.addEventListener("click", () => {
+          const target = pill.dataset.panel;
+          if (!target) return;
+          pills.forEach((p) => p.classList.remove("active"));
+          pill.classList.add("active");
+          scrollToPanel(target);
+    });
   });
-  document.getElementById('kdm_out').textContent = `Prepared ${raw.length} KDM entries (wire to /kdm/preview)`;
-}
+    }
 
-function pingWorker(){
-  const el = document.getElementById('worker_state');
-  el.classList.add('ok');
-  el.textContent = 'online (stub)';
-  document.getElementById('worker_out').textContent = 'Worker ping (wire to /internal/health)';
-}
+    function initNeonGraph() {
+      const hops = document.querySelectorAll(".neon-hop");
+      const timeline = document.getElementById("timelineSteps");
+      if (!timeline) return;
+
+      const steps = [
+        "Upload",
+        "Ingest S3",
+        "Worker queue",
+        "Encode/QC",
+        "Manifest",
+        "TSA",
+        "Verify API",
+        "Vault",
+        "KDM",
+      ];
+
+      const stepKeys = [
+        "upload",
+        "ingest",
+        "queue",
+        "encode",
+        "manifest",
+        "tsa",
+        "verify",
+        "vault",
+        "kdm",
+      ];
+
+      steps.forEach((label, idx) => {
+        const step = document.createElement("div");
+        step.className = "timeline-step";
+        step.dataset.key = stepKeys[idx];
+
+        const dot = document.createElement("span");
+        dot.className = "timeline-step-dot";
+
+        const span = document.createElement("span");
+        span.textContent = label;
+
+        if (dot && span) {
+          step.appendChild(dot);
+          step.appendChild(span);
+        }
+
+        if (timeline) {
+          timeline.appendChild(step);
+        }
+
+        if (idx < steps.length - 1 && timeline) {
+          const arrow = document.createElement("span");
+          arrow.className = "timeline-arrow";
+          arrow.textContent = "›";
+          timeline.appendChild(arrow);
+        }
+      });
+
+      function activateHop(key) {
+        hops.forEach((h) => {
+          if (h.dataset.hop === key) {
+            h.classList.add("active");
+          } else {
+            h.classList.remove("active");
+          }
+        });
+
+        const stepsDom = timeline.querySelectorAll(".timeline-step");
+        stepsDom.forEach((step) => {
+          const dot = step.querySelector(".timeline-step-dot");
+          if (!dot) return;
+          if (step.dataset.key === key) {
+            step.classList.add("active");
+          } else {
+            step.classList.remove("active");
+          }
+        });
+      }
+
+      hops.forEach((hop) => {
+        hop.addEventListener("mouseenter", () => {
+          activateHop(hop.dataset.hop);
+        });
+        hop.addEventListener("click", () => {
+          activateHop(hop.dataset.hop);
+        });
+      });
+
+      activateHop("encode");
+    }
+
+    function initQcGraph() {
+      const container = document.getElementById("qcLines");
+      if (!container) return;
+
+      const segments = 60;
+      for (let i = 0; i < segments; i++) {
+        const lum = document.createElement("div");
+        lum.className = "qc-line lum";
+        lum.style.height = `${60 + Math.random() * 30}%`;
+        lum.style.animationDelay = `${i * 15}ms`;
+
+        const warn = document.createElement("div");
+        warn.className = "qc-line warn";
+        warn.style.height = `${20 + Math.random() * 40}%`;
+        warn.style.animationDelay = `${i * 20}ms`;
+
+        const fail = document.createElement("div");
+        fail.className = "qc-line fail";
+        fail.style.height = `${10 + Math.random() * 20}%`;
+        fail.style.animationDelay = `${i * 25}ms`;
+
+        container.appendChild(lum);
+        container.appendChild(warn);
+        container.appendChild(fail);
+      }
+    }
+
+    function initCommandPalette() {
+      const modal = document.getElementById("searchModal");
+      const input = document.getElementById("searchInput");
+      const options = document.querySelectorAll(".search-option");
+
+      if (!modal || !input) return;
+
+      function resolveSection(query) {
+        const s = query.trim().toLowerCase();
+        const map = {
+          "up": "upload",
+          "upl": "upload",
+          "upload": "upload",
+          "jo": "jobs",
+          "job": "jobs",
+          "jobs": "jobs",
+          "q": "qc",
+          "qc": "qc",
+          "pro": "proof",
+          "proof": "proof",
+          "w": "worker",
+          "work": "worker",
+          "worker": "worker",
+          "kd": "kdm",
+          "kdm": "kdm",
+          "v": "vault",
+          "va": "vault",
+          "vault": "vault",
+          "ne": "neon",
+          "neo": "neon",
+          "neon": "neon"
+        };
+        return map[s] || null;
+      }
+
+      function openModal() {
+        modal.classList.add("open");
+        document.body.classList.add("modal-open");
+        input.value = "";
+        // Use setTimeout to ensure modal is visible before focusing
+        setTimeout(() => {
+          input.focus();
+        }, 100);
+      }
+
+      function closeModal() {
+        modal.classList.remove("open");
+        document.body.classList.remove("modal-open");
+        input.value = "";
+      }
+
+      document.addEventListener("keydown", (e) => {
+        const key = e.key.toLowerCase();
+        const meta = e.metaKey || e.ctrlKey;
+
+        if (meta && key === "k") {
+          e.preventDefault();
+          openModal();
+        } else if (key === "escape") {
+          if (modal.classList.contains("open")) {
+            e.preventDefault();
+            closeModal();
+          }
+        }
+      });
+
+      options.forEach((opt) => {
+        opt.addEventListener("click", () => {
+          const section = opt.dataset.section;
+          if (section) scrollToPanel(section);
+          closeModal();
+        });
+      });
+
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          const query = input.value.trim();
+          const section = resolveSection(query);
+          if (section) {
+            scrollToPanel(section);
+            closeModal();
+          }
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          closeModal();
+        }
+      });
+
+      // Focus trap: prevent tabbing outside modal
+      modal.addEventListener("keydown", (e) => {
+        if (e.key === "Tab" && modal.classList.contains("open")) {
+          const focusableElements = modal.querySelectorAll(
+            'input, button, [tabindex]:not([tabindex="-1"])'
+          );
+          if (focusableElements.length === 0) return;
+          
+          const firstElement = focusableElements[0];
+          const lastElement = focusableElements[focusableElements.length - 1];
+
+          if (e.shiftKey && document.activeElement === firstElement) {
+            e.preventDefault();
+            if (lastElement && typeof lastElement.focus === 'function') {
+              lastElement.focus();
+            }
+          } else if (!e.shiftKey && document.activeElement === lastElement) {
+            e.preventDefault();
+            if (firstElement && typeof firstElement.focus === 'function') {
+              firstElement.focus();
+            }
+          }
+        }
+      });
+
+      modal.addEventListener("click", (e) => {
+        if (e.target === modal) closeModal();
+      });
+    }
+
+    function initKdm() {
+      const btn = document.getElementById("btnKdmPreview");
+      const status = document.getElementById("kdmPreviewStatus");
+      const recipients = document.getElementById("kdmRecipients");
+      const from = document.getElementById("kdmValidFrom");
+      const until = document.getElementById("kdmValidUntil");
+      if (!btn || !status || !from || !until) return;
+
+      function clearWarnings() {
+        if (from) from.classList.remove("input-warning");
+        if (until) until.classList.remove("input-warning");
+      }
+
+      btn.addEventListener("click", () => {
+        clearWarnings();
+
+        const fromValue = from.value.trim();
+        const untilValue = until.value.trim();
+
+        if (!fromValue || !untilValue) {
+          if (!fromValue) {
+            from.classList.add("input-warning");
+          }
+          if (!untilValue) {
+            until.classList.add("input-warning");
+          }
+          showDevHint("Set both Valid From and Valid Until to preview KDM.");
+      return;
+    }
+
+        const count =
+          recipients.value
+            .split("\n")
+            .map((l) => l.trim())
+            .filter(Boolean).length || 0;
+
+        // Format datetime-local value for display
+        const fromDate = new Date(fromValue);
+        const untilDate = new Date(untilValue);
+        const fromText = fromDate.toLocaleString();
+        const untilText = untilDate.toLocaleString();
+
+        status.textContent = `Preview: ${count} KDM(s) from ${fromText} to ${untilText} (dev stub).`;
+      });
+
+      // Clear warnings when user starts typing
+      from.addEventListener("input", clearWarnings);
+      until.addEventListener("input", clearWarnings);
+    }
+
+    function initUpload() {
+      const btnUpload = document.getElementById("btnUpload");
+      const btnClear = document.getElementById("btnUploadClear");
+      const btnIngestUrl = document.getElementById("btnIngestUrl");
+      const input = document.getElementById("fileInput");
+      const urlInput = document.getElementById("urlInput");
+      const statusText = document.getElementById("uploadStatusText");
+      const statusPill = document.getElementById("uploadStatusPill");
+      if (!btnUpload || !btnClear || !input || !statusText || !statusPill) return;
+
+      function updateStatus(message, status = "ok") {
+        statusText.innerHTML = `<span class="status-dot ${status}"></span>${message}`;
+        statusPill.textContent = status === "ok" ? "Idle" : "Processing";
+        statusPill.className = `status-pill ${status}`;
+      }
+
+      btnUpload.addEventListener("click", () => {
+        updateStatus(
+          "Dev console: this simulates an upload. In production, files stream to S3 and a job is queued."
+        );
+      });
+
+      btnClear.addEventListener("click", () => {
+        input.value = "";
+        updateStatus(
+          "Ready. Select a CPL or picture/audio masters and hit <strong>Upload</strong>."
+        );
+      });
+
+      if (btnIngestUrl && urlInput) {
+        btnIngestUrl.addEventListener("click", () => {
+          const url = urlInput.value.trim();
+          if (!url) {
+            updateStatus("Please enter a URL.", "warn");
+      return;
+    }
+          updateStatus(
+            `Dev console: would POST /upload/url with { source_url: '${url}' }`
+          );
+        });
+      }
+    }
+
+    function initWorkers() {
+      const btn = document.getElementById("btnRefreshWorkers");
+      const dot = document.getElementById("workerStatusDot");
+      const text = document.getElementById("workerStatusText");
+      const summary = document.getElementById("workerStatusSummary");
+
+      if (!btn || !dot || !text || !summary) return;
+
+      async function check() {
+        if (!text || !summary || !dot) return;
+        
+        text.textContent = "checking /internal/health…";
+        summary.textContent = "Workers: probing";
+        dot.className = "status-dot warn";
+
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000);
+          
+          const res = await fetch(`${API_BASE}/internal/health`, {
+            signal: controller.signal
+          });
+          
+          clearTimeout(timeoutId);
+          
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+          }
+          
+          let data;
+          try {
+            data = await res.json();
+          } catch (jsonErr) {
+            throw new Error("Invalid JSON response");
+          }
+          
+          const workersOk = data && data.worker === "ok";
+          if (workersOk) {
+            text.textContent = "Workers: online";
+            summary.textContent = "Workers: 1x CPU · 0x GPU (dev)";
+            dot.className = "status-dot ok";
+          } else {
+            text.textContent = "Workers: health check failed";
+            summary.textContent = "Workers: offline";
+            dot.className = "status-dot err";
+          }
+        } catch (err) {
+          if (err.name === 'AbortError') {
+            text.textContent = "Workers: request timeout";
+            summary.textContent = "Workers: timeout";
+          } else {
+            text.textContent = "Workers: connection failed";
+            summary.textContent = "Workers: offline";
+          }
+          dot.className = "status-dot err";
+        }
+      }
+
+      btn.addEventListener("click", () => {
+        check();
+      });
+
+      check();
+    }
+
+    function initJobs() {
+      const btn = document.getElementById("btnCreateJob");
+      if (!btn) return;
+
+      btn.addEventListener("click", () => {
+        showDevHint(
+          "Dev console: creating a pseudo-job. In production, this posts to /jobs with all parameters."
+        );
+      });
+    }
+
+    function initProof() {
+      const btnInit = document.getElementById("btnInitProof");
+      const btnAck = document.getElementById("btnAckTSA");
+      const btnFetch = document.getElementById("btnFetchManifest");
+      const btnVerify = document.getElementById("btnVerifyProof");
+
+      btnInit?.addEventListener("click", () => {
+        showDevHint(
+          "Dev console: would POST /proof/init with manifest_sha256 or job ref."
+        );
+      });
+
+      btnAck?.addEventListener("click", () => {
+        showDevHint(
+          "Dev console: would POST /proof/ack/tsa with a TSA-signed TSR payload."
+        );
+      });
+
+      btnFetch?.addEventListener("click", () => {
+        showDevHint("Dev console: would GET /proof/manifest/{job_id}.");
+      });
+
+      btnVerify?.addEventListener("click", () => {
+        showDevHint(
+          "Dev console: would GET /proof/status/{manifest_sha256} and display the result."
+        );
+      });
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      pingApi();
+      initNav();
+      initNeonGraph();
+      initQcGraph();
+      initCommandPalette();
+      initKdm();
+      initUpload();
+      initWorkers();
+      initJobs();
+      initProof();
+  });
+</script>
+<script>
+  window.API_BASE = "http://localhost:8080";
 </script>
 </body>
 </html>

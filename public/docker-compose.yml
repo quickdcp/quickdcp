@@ -1,0 +1,81 @@
+services:
+  quickdcp-api:
+    image: quickdcp-api:latest
+    container_name: quickdcp-api
+    build:
+      context: .
+      dockerfile: infra/Dockerfile
+    environment:
+      WORKER_TOKEN: dev
+      DB_URL: postgresql://postgres:postgres@supabase:5432/postgres
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+      MINIO_BUCKET: quickdcp
+      MINIO_BUCKET_OUT: quickdcp-out
+      MINIO_BUCKET_VAULT: quickdcp-vault
+      MINIO_BUCKET_LOGS: quickdcp-logs
+    depends_on:
+      - supabase
+      - minio
+    ports:
+      - "8080:8080"
+
+  quickdcp-worker:
+    image: quickdcp-worker:latest
+    container_name: quickdcp-worker
+    build:
+      context: .
+      dockerfile: infra/Dockerfile
+    environment:
+      WORKER_TOKEN: dev
+      API_URL: http://quickdcp-api:8080
+    depends_on:
+      - quickdcp-api
+      - minio
+      - supabase
+
+  minio:
+    image: minio/minio:latest
+    container_name: quickdcp-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - ./.data/minio:/data
+
+  mc-init:
+    image: minio/mc:latest
+    container_name: quickdcp-mc-init
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+        sleep 2 &&
+        mc alias set local http://minio:9000 minio minio123 &&
+        mc mb -p local/quickdcp || true &&
+        mc mb -p local/quickdcp-out || true &&
+        mc mb -p local/quickdcp-vault || true &&
+        mc mb -p local/quickdcp-logs || true
+      "
+
+  supabase:
+    image: supabase/postgres:15.1.0.112
+    container_name: quickdcp-supabase
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./.data/supabase:/var/lib/postgresql/data
+      - ./supabase/migrations:/docker-entrypoint-initdb.d
+
+networks:
+  default:
+    name: quickdcp_default

@@ -1,0 +1,16 @@
+FROM python:3.13-slim
+
+WORKDIR /app
+
+COPY infra/requirements.txt /app/
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY api/ /app/api/
+COPY public/ /app/public/
+COPY worker/ /app/worker/
+
+ENV API_ENV=production
+
+EXPOSE 8080
+
+CMD ["python3", "-m", "api.main"]

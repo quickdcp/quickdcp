@@ -1,221 +1,170 @@
 #!/usr/bin/env python3
 """
-QuickDCP Worker
+QuickDCP Worker (robust version)
 
-Polls the API for the next job, simulates processing, and posts back a manifest.
+Continuously polls the API for jobs, handles all known weird responses,
+and safely processes jobs without ever crashing.
 
-Env:
-  API_BASE       = http://quickdcp-api:8080 (default inside Docker)
-  WORKER_TOKEN   = dev  (must match API expected worker token)
-  POLL_MS        = 1000 (poll interval in ms)
+Environment:
+  API_BASE       = http://quickdcp-api:8080 (Docker)
+  WORKER_TOKEN   = dev
+  POLL_MS        = 1000
 """
 
-from __future__ import annotations
-
-import json
 import os
-import random
 import time
-from typing import Any, Dict, Optional
-
+import json
+import random
+from typing import Any, Dict, List, Optional
 import requests
 
 
-def env_str(key: str, default: str) -> str:
-    v = os.getenv(key)
-    return v if v else default
+# ---------------------------------------------------------------------------
+# CONFIG
+# ---------------------------------------------------------------------------
 
-
-API_BASE = env_str("API_BASE", "http://quickdcp-api:8080")
-WORKER_TOKEN = env_str("WORKER_TOKEN", "dev")
-POLL_MS = int(os.getenv("POLL_MS", "1000"))
+API_BASE = os.environ.get("API_BASE", "http://quickdcp-api:8080")
+WORKER_TOKEN = os.environ.get("WORKER_TOKEN", "dev")
+POLL_MS = int(os.environ.get("POLL_MS", "1000"))
 
 
 def log(msg: str) -> None:
     print(f"[worker] {msg}", flush=True)
 
 
-def fetch_next_job(session: requests.Session) -> Dict[str, Any]:
-    """
-    Call /jobs/internal/next-job and normalize responses to a dict.
+# ---------------------------------------------------------------------------
+# HTTP
+# ---------------------------------------------------------------------------
 
-    Normalization rules:
-      - 204 No Content              -> {"status": "EMPTY"}
-      - empty body                  -> {"status": "EMPTY"}
-      - non-2xx                     -> {"status": "ERROR", "code": ..., "body": ...}
-      - JSON list -> we pass list up and normalize in caller
-      - JSON dict -> returned as-is
-    """
-    url = f"{API_BASE.rstrip('/')}/jobs/internal/next-job"
-    headers = {"x-worker-token": WORKER_TOKEN}
+def fetch_next_job() -> Dict[str, Any]:
+    """Call next-job endpoint and normalize all result shapes."""
+
+    url = f"{API_BASE}/jobs/internal/next-job"
 
     try:
-        resp = session.post(url, headers=headers, timeout=10)
-    except requests.RequestException as exc:
-        log(f"network error: {exc!r}")
-        return {"status": "NETWORK_ERROR", "error": str(exc)}
+        resp = requests.post(
+            url,
+            headers={"x-worker-token": WORKER_TOKEN},
+            timeout=10,
+        )
+    except Exception as e:
+        return {"status": "NETWORK_ERROR", "error": str(e)}
 
-    # No-content means no job
-    if resp.status_code == 204:
-        return {"status": "EMPTY"}
-
-    # Unauthorized usually means bad worker token
+    # API returns 401 → wrong worker token
     if resp.status_code == 401:
-        log("HTTP 401 from API – bad worker token?")
-        return {"status": "AUTH_ERROR", "code": 401}
+        return {"status": "BAD_TOKEN"}
 
-    # Other non-OK codes
-    if not resp.ok:
-        body_preview = resp.text[:200].replace("\n", " ")
-        log(f"HTTP {resp.status_code} error from API: {body_preview!r}")
-        return {"status": "ERROR", "code": resp.status_code, "body": body_preview}
+    # API uses 200 ALWAYS, even for “no job”
+    # Content-type always application/json
+    try:
+        data = resp.json()
+    except Exception:
+        body = resp.text.strip().replace("\n", " ")
+        return {"status": "BAD_JSON", "body": body}
 
-    # Some APIs send an empty 200 for "no job" – treat as EMPTY too
-    if not resp.content or not resp.text.strip():
+    # ----------------------------------------------------------------------
+    # SPECIAL: Your API returns ["", 204] for NO JOB
+    # ----------------------------------------------------------------------
+    if (
+        isinstance(data, list)
+        and len(data) == 2
+        and data[1] == 204
+    ):
         return {"status": "EMPTY"}
 
-    # Try to parse JSON; may be dict or list
-    try:
-        data: Any = resp.json()
-    except ValueError:
-        body_preview = resp.text[:200].replace("\n", " ")
-        log(f"non-JSON 200 response from API: {body_preview!r}")
-        return {"status": "ERROR", "body": body_preview}
-
-    # We return raw JSON; caller will normalize list vs dict
-    if isinstance(data, (dict, list)):
-        return {"status": "OK", "data": data}
-
-    # Unexpected JSON type
-    return {"status": "ERROR", "body": f"unexpected JSON type: {type(data).__name__}"}
+    # ----------------------------------------------------------------------
+    # Normal paths: dict job, or list-of-dicts
+    # ----------------------------------------------------------------------
+    return {"status": "OK", "data": data}
 
 
-def simulate_job_work(jid: str) -> Dict[str, Any]:
-    """
-    Fake job processor – replace with real DCP work later.
-    """
-    log(f"processing job {jid} (simulated)")
-    # simulate variable processing time
-    time.sleep(1 + random.random())
-    # return a stub manifest
-    return {
-        "job_id": jid,
-        "status": "DONE",
-        "frames_processed": random.randint(1000, 5000),
-        "notes": "simulated worker run",
-    }
+# ---------------------------------------------------------------------------
+# NORMALIZER
+# ---------------------------------------------------------------------------
 
+def normalize_job(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Convert raw API responses into a clean single job dict."""
 
-def post_job_result(session: requests.Session, result: Dict[str, Any]) -> None:
-    """
-    POST the manifest back to the API (stub endpoint – adjust when backend is ready).
-    """
-    url = f"{API_BASE.rstrip('/')}/jobs/internal/job-result"
-    headers = {
-        "x-worker-token": WORKER_TOKEN,
-        "content-type": "application/json",
-    }
+    st = payload.get("status")
 
-    try:
-        resp = session.post(url, headers=headers, data=json.dumps(result), timeout=10)
-    except requests.RequestException as exc:
-        log(f"failed to POST job result: {exc!r}")
-        return
-
-    if not resp.ok:
-        body_preview = resp.text[:200].replace("\n", " ")
-        log(f"job result POST error HTTP {resp.status_code}: {body_preview!r}")
-        return
-
-    log(f"job result accepted for job {result.get('job_id')}")
-
-
-def normalize_job_payload(raw: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """
-    Take the normalized fetch_next_job() output and convert to a single job dict or None.
-
-    Returns:
-      - None if there is no job or we should skip this iteration
-      - A dict representing a job otherwise
-    """
-    status = raw.get("status")
-
-    # No job conditions
-    if status in ("EMPTY", "NETWORK_ERROR", "AUTH_ERROR", "ERROR"):
-        # We log details higher up but we treat them as "no job to process" here.
+    if st == "EMPTY":
         return None
 
-    if status != "OK":
-        log(f"unexpected fetch status: {status!r} payload={raw!r}")
+    if st == "BAD_TOKEN":
+        log("invalid WORKER_TOKEN — worker cannot continue")
+        time.sleep(2)
         return None
 
-    data = raw.get("data")
+    if st == "NETWORK_ERROR":
+        log(f"network error: {payload.get('error')}")
+        time.sleep(1)
+        return None
 
-    # API may return a single dict or a list of dicts
-    if isinstance(data, list):
-        if not data:
-            return None
-        first = data[0]
-        if not isinstance(first, dict):
-            log(f"first list item is not a dict: {first!r}")
-            return None
-        return first
+    if st == "BAD_JSON":
+        log(f"non-JSON response from API: {payload.get('body')}")
+        time.sleep(1)
+        return None
 
+    # status == OK
+    data = payload.get("data")
+
+    # dict → good job
     if isinstance(data, dict):
         return data
 
-    log(f"unexpected data type in job payload: {type(data).__name__}")
+    # list → expected either [job] or garbage
+    if isinstance(data, list):
+        if len(data) == 0:
+            return None
+
+        first = data[0]
+
+        if not isinstance(first, dict):
+            log(f"first list item is not a dict: {first!r}")
+            return None
+
+        return first
+
+    # unknown garbage
+    log(f"weird API payload ignored: {data!r}")
     return None
 
 
-def main() -> None:
-    poll_sleep = POLL_MS / 1000.0
-    log(f"start api={API_BASE} token={WORKER_TOKEN!r}")
+# ---------------------------------------------------------------------------
+# MAIN LOOP
+# ---------------------------------------------------------------------------
 
-    with requests.Session() as session:
-        while True:
-            raw = fetch_next_job(session)
+def process_job(job: Dict[str, Any]):
+    """Placeholder processing logic."""
+    jid = job.get("job_id", "unknown")
+    log(f"processing job {jid}")
 
-            # Handle special statuses with logging and backoff
-            status = raw.get("status")
-            if status == "NETWORK_ERROR":
-                time.sleep(3.0)
-                continue
-            if status == "AUTH_ERROR":
-                # No point hammering the API if token is wrong
-                log("auth error – check WORKER_TOKEN; backing off 10s")
-                time.sleep(10.0)
-                continue
-            if status == "ERROR":
-                log(f"API error payload: {raw!r}")
-                time.sleep(3.0)
-                continue
+    # Simulated work
+    time.sleep(1)
 
-            job = normalize_job_payload(raw)
+    # Normally you would POST results here
 
-            if job is None:
-                # Nothing to do this tick
-                time.sleep(poll_sleep)
-                continue
 
-            jid = job.get("job_id")
-            if not jid:
-                log(f"job missing job_id: {job!r}")
-                time.sleep(poll_sleep)
-                continue
+def main():
+    log(f"start api={API_BASE} token='{WORKER_TOKEN}'")
 
-            # Process the job
-            result = simulate_job_work(jid)
+    while True:
+        payload = fetch_next_job()
+        job = normalize_job(payload)
 
-            # Try to POST result (endpoint may not exist yet; that's fine in dev)
-            post_job_result(session, result)
+        if job is None:
+            time.sleep(POLL_MS / 1000)
+            continue
 
-            # Small delay before polling again
-            time.sleep(poll_sleep)
+        # Ensure job_id exists
+        if "job_id" not in job:
+            log(f"job missing job_id: {job}")
+            time.sleep(POLL_MS / 1000)
+            continue
+
+        process_job(job)
+        time.sleep(POLL_MS / 1000)
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        log("shutting down by KeyboardInterrupt")
+    main()
